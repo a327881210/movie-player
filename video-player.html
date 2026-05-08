@@ -1,0 +1,1257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>视频播放器</title>
+  <style>
+    :root {
+      --bg: #0f0f13;
+      --panel: #1a1a22;
+      --card: #22222e;
+      --card-hover: #2a2a3a;
+      --accent: #6c63ff;
+      --accent2: #ff6b6b;
+      --text: #e8e8f0;
+      --muted: #7a7a9a;
+      --border: #2d2d3e;
+      --progress: #6c63ff;
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── 顶栏 ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      height: 56px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      z-index: 10;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    .logo svg { color: var(--accent); }
+    .search-bar {
+      display: flex;
+      align-items: center;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 6px 16px;
+      gap: 8px;
+      width: 300px;
+      transition: border-color 0.2s;
+    }
+    .search-bar:focus-within { border-color: var(--accent); }
+    .search-bar input {
+      background: none;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-size: 14px;
+      width: 100%;
+    }
+    .search-bar input::placeholder { color: var(--muted); }
+    .header-actions { display: flex; gap: 10px; }
+    .btn-icon {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 50%;
+      width: 36px; height: 36px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+    .btn-icon:hover { background: var(--card-hover); color: var(--text); }
+
+    /* ── 主布局 ── */
+    .main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── 侧边栏 ── */
+    .sidebar {
+      width: 260px;
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .sidebar-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+    }
+    .tab {
+      flex: 1;
+      padding: 12px 0;
+      text-align: center;
+      font-size: 13px;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    .tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    .playlist {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+    .playlist::-webkit-scrollbar { width: 4px; }
+    .playlist::-webkit-scrollbar-track { background: transparent; }
+    .playlist::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .playlist-item {
+      display: flex;
+      gap: 10px;
+      padding: 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s;
+      align-items: flex-start;
+    }
+    .playlist-item:hover { background: var(--card-hover); }
+    .playlist-item.active { background: var(--card); }
+    .playlist-item.active .item-title { color: var(--accent); }
+
+    .thumb-wrap {
+      position: relative;
+      flex-shrink: 0;
+      width: 80px; height: 50px;
+      border-radius: 6px;
+      overflow: hidden;
+      background: #111;
+    }
+    .thumb-wrap img { width: 100%; height: 100%; object-fit: cover; }
+    .thumb-duration {
+      position: absolute;
+      bottom: 2px; right: 4px;
+      background: rgba(0,0,0,0.75);
+      color: #fff;
+      font-size: 10px;
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+    .item-info { flex: 1; min-width: 0; }
+    .item-title {
+      font-size: 12px;
+      line-height: 1.4;
+      color: var(--text);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .item-meta { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+    /* ── 播放区 ── */
+    .player-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #000;
+    }
+
+    .video-wrap {
+      position: relative;
+      flex: 1;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      cursor: pointer;
+    }
+
+    video {
+      max-width: 100%;
+      max-height: 100%;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    /* 大播放按钮 */
+    .big-play {
+      position: absolute;
+      width: 72px; height: 72px;
+      border-radius: 50%;
+      background: rgba(108, 99, 255, 0.85);
+      display: flex; align-items: center; justify-content: center;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.25s;
+    }
+    .big-play.show { opacity: 1; }
+    .big-play svg { margin-left: 4px; }
+
+    /* 空状态 */
+    .empty-state {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      color: var(--muted);
+    }
+    .empty-state svg { opacity: 0.3; }
+    .empty-state p { font-size: 14px; }
+
+    /* 文件拖放覆盖层 */
+    .drop-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(108,99,255,0.15);
+      border: 3px dashed var(--accent);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+      font-size: 18px;
+      font-weight: 600;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .drop-overlay.show { opacity: 1; }
+
+    /* ── 控制栏 ── */
+    .controls {
+      background: var(--panel);
+      border-top: 1px solid var(--border);
+      padding: 0 20px 12px;
+      flex-shrink: 0;
+    }
+
+    /* 进度条 */
+    .progress-area {
+      padding: 10px 0 4px;
+      cursor: pointer;
+      position: relative;
+    }
+    .progress-track {
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      position: relative;
+      overflow: hidden;
+      transition: height 0.15s;
+    }
+    .progress-area:hover .progress-track { height: 6px; }
+    .progress-filled {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), #a89fff);
+      border-radius: 2px;
+      width: 0%;
+      pointer-events: none;
+    }
+    .progress-buffer {
+      position: absolute;
+      top: 0; left: 0;
+      height: 100%;
+      background: rgba(255,255,255,0.12);
+      border-radius: 2px;
+      width: 0%;
+      pointer-events: none;
+    }
+    .progress-thumb {
+      position: absolute;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 0 4px rgba(0,0,0,0.5);
+      opacity: 0;
+      transition: opacity 0.15s;
+      pointer-events: none;
+    }
+    .progress-area:hover .progress-thumb { opacity: 1; }
+
+    /* 时间提示 */
+    .time-tooltip {
+      position: absolute;
+      top: -28px;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.85);
+      color: #fff;
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      pointer-events: none;
+      opacity: 0;
+      white-space: nowrap;
+    }
+    .progress-area:hover .time-tooltip { opacity: 1; }
+
+    /* 底部按钮行 */
+    .ctrl-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 4px;
+    }
+    .ctrl-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 6px;
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      transition: color 0.15s, background 0.15s;
+      font-size: 12px;
+    }
+    .ctrl-btn:hover { color: var(--text); background: var(--card); }
+    .ctrl-btn.active { color: var(--accent); }
+
+    .play-btn {
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s, transform 0.1s;
+      margin: 0 4px;
+    }
+    .play-btn:hover { background: #7c74ff; transform: scale(1.05); }
+    .play-btn:active { transform: scale(0.96); }
+
+    .time-display {
+      font-size: 12px;
+      color: var(--muted);
+      margin: 0 8px;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .spacer { flex: 1; }
+
+    /* 音量 */
+    .volume-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .volume-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 70px;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--border);
+      outline: none;
+      cursor: pointer;
+    }
+    .volume-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+    }
+    .volume-slider::-moz-range-thumb {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      border: none;
+    }
+
+    /* 速度选择 */
+    .speed-select {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 12px;
+      cursor: pointer;
+      outline: none;
+    }
+    .speed-select:focus { border-color: var(--accent); }
+
+    /* 画质标签 */
+    .quality-badge {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 4px;
+    }
+
+    /* 视频标题条 */
+    .video-title-bar {
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .video-title {
+      font-size: 14px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 60%;
+    }
+    .video-subtitle { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+    /* 右侧信息面板 */
+    .info-panel {
+      width: 240px;
+      background: var(--panel);
+      border-left: 1px solid var(--border);
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      padding: 16px;
+      gap: 16px;
+    }
+    .info-panel::-webkit-scrollbar { width: 4px; }
+    .info-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .info-section h4 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      padding: 5px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .info-row:last-child { border-bottom: none; }
+    .info-label { color: var(--muted); }
+    .info-value { color: var(--text); font-weight: 500; }
+
+    /* 开场动效 */
+    @keyframes fadeIn { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform: none; } }
+    .player-area, .sidebar, .info-panel { animation: fadeIn 0.4s ease; }
+
+    /* 全屏适配 */
+    .video-wrap:fullscreen video { width: 100%; height: 100%; }
+
+    /* 响应式 */
+    @media (max-width: 900px) {
+      .info-panel { display: none; }
+      .sidebar { width: 200px; }
+    }
+    @media (max-width: 600px) {
+      .sidebar { display: none; }
+      .search-bar { display: none; }
+    }
+
+    /* 打开文件按钮 */
+    .open-file-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .open-file-btn:hover { background: #7c74ff; }
+    .open-file-btn:active { transform: scale(0.97); }
+
+    /* 截图提示 */
+    .snapshot-toast {
+      position: fixed;
+      top: 70px;
+      right: 20px;
+      background: var(--accent);
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+      z-index: 999;
+    }
+    .snapshot-toast.show { opacity: 1; }
+
+    /* URL嵌入模式 */
+    #urlInputContainer {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 16px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+    }
+    #urlInputContainer.show { display: flex; }
+    #urlInput {
+      flex: 1;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 14px;
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+    }
+    #urlInput:focus { border-color: var(--accent); }
+    #urlInput::placeholder { color: var(--muted); }
+    .url-btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+    .url-btn:hover { background: #7c74ff; }
+    .url-btn.cancel-btn { background: var(--card); color: var(--muted); border: 1px solid var(--border); }
+    .url-btn.cancel-btn:hover { background: var(--card-hover); color: var(--text); }
+
+    /* iframe容器 */
+    #iframeContainer {
+      display: none;
+      width: 100%;
+      height: 100%;
+      background: #000;
+    }
+    #iframeContainer.show { display: block; }
+    #iframeContainer iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+
+    /* iframe错误提示 */
+    .iframe-error {
+      position: absolute;
+      inset: 0;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #111;
+      color: var(--muted);
+      text-align: center;
+      padding: 40px;
+      gap: 16px;
+      z-index: 10;
+    }
+    .iframe-error.show { display: flex; }
+    .iframe-error p { font-size: 14px; line-height: 1.6; max-width: 480px; }
+    .iframe-error .hint { font-size: 12px; color: var(--accent); margin-top: 4px; }
+  </style>
+</head>
+<body>
+
+<!-- 顶栏 -->
+<header>
+  <div class="logo">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm8 3L9 9h2v6h2V9h2L12 7z"/>
+    </svg>
+    视频播放器
+  </div>
+
+  <div style="display:flex;align-items:center;gap:8px;flex:1;max-width:500px;margin:0 20px;">
+    <div class="search-bar" style="flex:1">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input type="text" placeholder="搜索视频..." id="searchInput" />
+    </div>
+  </div>
+
+  <div class="header-actions">
+    <button class="btn-icon" id="btnUrlMode" title="粘贴网址播放" onclick="showUrlInput()" style="background:var(--card);border:1px solid var(--border);color:var(--muted);">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+      </svg>
+    </button>
+    <button class="btn-icon" title="打开本地视频" onclick="triggerFileOpen()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+      </svg>
+    </button>
+    <button class="btn-icon" title="全屏" id="btnFullscreen">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/>
+        <line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
+      </svg>
+    </button>
+    <button class="btn-icon" title="截图" id="btnSnapshot">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+        <circle cx="12" cy="13" r="4"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<!-- URL输入条 -->
+<div id="urlInputContainer">
+  <input type="text" id="urlInput" placeholder="粘贴网址链接，按回车播放，如 https://..." />
+  <button class="url-btn" onclick="loadUrl()">▶ 播放</button>
+  <button class="url-btn cancel-btn" onclick="exitUrlMode()">✕ 取消</button>
+</div>
+
+<div class="main">
+
+  <!-- 左侧播放列表 -->
+  <div class="sidebar">
+    <div class="sidebar-tabs">
+      <div class="tab active" data-tab="playlist">播放列表</div>
+      <div class="tab" data-tab="history">历史记录</div>
+    </div>
+    <div class="playlist" id="playlistEl">
+      <!-- 由 JS 渲染 -->
+    </div>
+  </div>
+
+  <!-- 中间播放区 -->
+  <div class="player-area">
+    <!-- 标题条 -->
+    <div class="video-title-bar">
+      <div>
+        <div class="video-title" id="videoTitle">等待播放...</div>
+        <div class="video-subtitle" id="videoSubtitle">拖入视频文件或点击右上角文件夹图标</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span class="quality-badge" id="qualityBadge">-</span>
+      </div>
+    </div>
+
+    <!-- 视频画面 -->
+    <div class="video-wrap" id="videoWrap">
+      <video id="mainVideo" preload="metadata"></video>
+
+      <div class="big-play" id="bigPlay">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="#fff">
+          <polygon points="5 3 19 12 5 21 5 3"/>
+        </svg>
+      </div>
+
+      <div class="empty-state" id="emptyState">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+          <path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.95C18.88 4 12 4 12 4s-6.88 0-8.59.47A2.78 2.78 0 0 0 1.46 6.42 29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.41 19.08C5.12 19.55 12 19.55 12 19.55s6.88 0 8.59-.47a2.78 2.78 0 0 0 1.95-1.95A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"/>
+          <polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="currentColor"/>
+        </svg>
+        <p>拖入视频开始播放</p>
+        <button class="open-file-btn" onclick="triggerFileOpen()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+          </svg>
+          打开本地视频
+        </button>
+      </div>
+
+      <div class="drop-overlay" id="dropOverlay">松开鼠标以播放</div>
+
+      <!-- iframe嵌入容器 -->
+      <div id="iframeContainer">
+        <iframe id="urlIframe" allow="autoplay; fullscreen" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+        <div class="iframe-error" id="iframeError">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="opacity:0.4">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <p>无法加载此页面<br>该网站可能禁止了嵌入，或需要登录/付费</p>
+          <p class="hint" id="iframeHint">提示：爱奇艺、优酷、腾讯视频等平台禁止嵌入，请直接访问原站</p>
+          <button class="url-btn" style="margin-top:8px" onclick="window.open(lastLoadedUrl, '_blank')">↗ 在新标签页打开</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 控制栏 -->
+    <div class="controls">
+      <!-- 进度条 -->
+      <div class="progress-area" id="progressArea">
+        <div class="progress-track">
+          <div class="progress-buffer" id="progressBuffer"></div>
+          <div class="progress-filled" id="progressFilled"></div>
+        </div>
+        <div class="progress-thumb" id="progressThumb"></div>
+        <div class="time-tooltip" id="timeTooltip">0:00</div>
+      </div>
+
+      <!-- 按钮行 -->
+      <div class="ctrl-row">
+        <!-- 上一个 -->
+        <button class="ctrl-btn" title="上一个" id="btnPrev">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="2"/>
+          </svg>
+        </button>
+
+        <!-- 播放/暂停 -->
+        <button class="play-btn" id="btnPlay">
+          <svg id="iconPlay" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+          <svg id="iconPause" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display:none">
+            <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
+          </svg>
+        </button>
+
+        <!-- 下一个 -->
+        <button class="ctrl-btn" title="下一个" id="btnNext">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2"/>
+          </svg>
+        </button>
+
+        <!-- 时间 -->
+        <span class="time-display" id="timeDisplay">0:00 / 0:00</span>
+
+        <div class="spacer"></div>
+
+        <!-- 循环 -->
+        <button class="ctrl-btn" title="循环" id="btnLoop">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+            <polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+          </svg>
+        </button>
+
+        <!-- 速度 -->
+        <select class="speed-select" id="speedSelect">
+          <option value="0.5">0.5x</option>
+          <option value="0.75">0.75x</option>
+          <option value="1" selected>1.0x</option>
+          <option value="1.25">1.25x</option>
+          <option value="1.5">1.5x</option>
+          <option value="2">2.0x</option>
+        </select>
+
+        <!-- 音量 -->
+        <div class="volume-wrap">
+          <button class="ctrl-btn" title="静音" id="btnMute">
+            <svg id="iconVol" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+            </svg>
+            <svg id="iconMuted" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+              <line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>
+            </svg>
+          </button>
+          <input type="range" class="volume-slider" id="volumeSlider" min="0" max="1" step="0.02" value="1" />
+        </div>
+
+        <!-- 画中画 -->
+        <button class="ctrl-btn" title="画中画" id="btnPip">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="3" width="20" height="14" rx="2"/><rect x="12" y="10" width="8" height="5" rx="1"/>
+          </svg>
+        </button>
+
+        <!-- 全屏 -->
+        <button class="ctrl-btn" title="全屏" id="btnFullscreen2">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/>
+            <line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 右侧信息面板 -->
+  <div class="info-panel" id="infoPanel">
+    <div class="info-section">
+      <h4>视频信息</h4>
+      <div class="info-row"><span class="info-label">文件名</span><span class="info-value" id="infoName">-</span></div>
+      <div class="info-row"><span class="info-label">时长</span><span class="info-value" id="infoDuration">-</span></div>
+      <div class="info-row"><span class="info-label">分辨率</span><span class="info-value" id="infoRes">-</span></div>
+      <div class="info-row"><span class="info-label">大小</span><span class="info-value" id="infoSize">-</span></div>
+    </div>
+    <div class="info-section">
+      <h4>播放状态</h4>
+      <div class="info-row"><span class="info-label">当前速度</span><span class="info-value" id="infoSpeed">1.0x</span></div>
+      <div class="info-row"><span class="info-label">循环模式</span><span class="info-value" id="infoLoop">关闭</span></div>
+      <div class="info-row"><span class="info-label">音量</span><span class="info-value" id="infoVol">100%</span></div>
+    </div>
+    <div class="info-section">
+      <h4>快捷键</h4>
+      <div class="info-row"><span class="info-label">空格</span><span class="info-value">播放/暂停</span></div>
+      <div class="info-row"><span class="info-label">← →</span><span class="info-value">快退/快进 5s</span></div>
+      <div class="info-row"><span class="info-label">↑ ↓</span><span class="info-value">音量 ±10%</span></div>
+      <div class="info-row"><span class="info-label">F</span><span class="info-value">全屏</span></div>
+      <div class="info-row"><span class="info-label">M</span><span class="info-value">静音</span></div>
+      <div class="info-row"><span class="info-label">L</span><span class="info-value">循环切换</span></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- 截图提示 -->
+<div class="snapshot-toast" id="snapshotToast">📸 截图已复制到剪贴板</div>
+
+<!-- 隐藏的文件输入 -->
+<input type="file" id="fileInput" accept="video/*" style="display:none" multiple />
+
+<script>
+// ── 数据 ──
+const playlist = [
+  { title: "示例：拖入视频文件开始播放", meta: "支持 MP4 / WebM / OGG 等格式", duration: "", thumb: "" },
+];
+
+let currentIndex = -1;
+let isDragging = false;
+let isLooping = false;
+let videoFiles = [];
+let historyList = [];
+
+// ── 元素 ──
+const video = document.getElementById('mainVideo');
+const btnPlay = document.getElementById('btnPlay');
+const iconPlay = document.getElementById('iconPlay');
+const iconPause = document.getElementById('iconPause');
+const btnPrev = document.getElementById('btnPrev');
+const btnNext = document.getElementById('btnNext');
+const progressArea = document.getElementById('progressArea');
+const progressFilled = document.getElementById('progressFilled');
+const progressBuffer = document.getElementById('progressBuffer');
+const progressThumb = document.getElementById('progressThumb');
+const timeTooltip = document.getElementById('timeTooltip');
+const timeDisplay = document.getElementById('timeDisplay');
+const volumeSlider = document.getElementById('volumeSlider');
+const btnMute = document.getElementById('btnMute');
+const iconVol = document.getElementById('iconVol');
+const iconMuted = document.getElementById('iconMuted');
+const speedSelect = document.getElementById('speedSelect');
+const btnLoop = document.getElementById('btnLoop');
+const btnPip = document.getElementById('btnPip');
+const emptyState = document.getElementById('emptyState');
+const bigPlay = document.getElementById('bigPlay');
+const dropOverlay = document.getElementById('dropOverlay');
+const playlistEl = document.getElementById('playlistEl');
+const videoTitle = document.getElementById('videoTitle');
+const videoSubtitle = document.getElementById('videoSubtitle');
+const qualityBadge = document.getElementById('qualityBadge');
+const fileInput = document.getElementById('fileInput');
+const snapshotToast = document.getElementById('snapshotToast');
+const searchInput = document.getElementById('searchInput');
+
+// ── 格式化时间 ──
+function fmtTime(sec) {
+  if (isNaN(sec)) return '0:00';
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = Math.floor(sec % 60);
+  if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  return `${m}:${String(s).padStart(2,'0')}`;
+}
+
+function fmtSize(bytes) {
+  if (!bytes) return '-';
+  if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+  if (bytes < 1024*1024*1024) return (bytes/1024/1024).toFixed(1) + ' MB';
+  return (bytes/1024/1024/1024).toFixed(2) + ' GB';
+}
+
+// ── 渲染播放列表 ──
+function renderPlaylist() {
+  const query = searchInput.value.toLowerCase();
+  playlistEl.innerHTML = '';
+  videoFiles.forEach((file, i) => {
+    if (query && !file.name.toLowerCase().includes(query)) return;
+    const item = document.createElement('div');
+    item.className = 'playlist-item' + (i === currentIndex ? ' active' : '');
+    item.innerHTML = `
+      <div class="thumb-wrap">
+        <div style="width:100%;height:100%;background:linear-gradient(135deg,#1e1e2e,#2a2a3a);display:flex;align-items:center;justify-content:center;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="#6c63ff"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        </div>
+        ${file.duration ? `<div class="thumb-duration">${fmtTime(file.duration)}</div>` : ''}
+      </div>
+      <div class="item-info">
+        <div class="item-title">${file.name}</div>
+        <div class="item-meta">${fmtSize(file.size)}</div>
+      </div>`;
+    item.onclick = () => playIndex(i);
+    playlistEl.appendChild(item);
+  });
+  if (videoFiles.length === 0) {
+    playlistEl.innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px;">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="opacity:0.4;display:block;margin:0 auto 10px">
+        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+      </svg>
+      暂无视频<br>请打开或拖入视频文件
+    </div>`;
+  }
+}
+
+// ── 播放指定索引 ──
+function playIndex(i) {
+  if (i < 0 || i >= videoFiles.length) return;
+  currentIndex = i;
+  const file = videoFiles[i];
+  const url = URL.createObjectURL(file);
+  video.src = url;
+  video.load();
+  video.play();
+  emptyState.style.display = 'none';
+  videoTitle.textContent = file.name;
+  videoSubtitle.textContent = fmtSize(file.size) + '  ·  ' + new Date(file.lastModified).toLocaleDateString('zh-CN');
+  document.getElementById('infoName').textContent = file.name.length > 14 ? file.name.substring(0,14)+'...' : file.name;
+  document.getElementById('infoSize').textContent = fmtSize(file.size);
+  renderPlaylist();
+}
+
+// ── 加载文件 ──
+function loadFiles(files) {
+  const videoMime = /^video\//;
+  const newFiles = Array.from(files).filter(f => videoMime.test(f.type) || /\.(mp4|webm|ogg|mov|avi|mkv|flv|m4v)$/i.test(f.name));
+  if (!newFiles.length) return;
+  videoFiles.push(...newFiles);
+  renderPlaylist();
+  if (currentIndex === -1) playIndex(0);
+  else playIndex(videoFiles.length - newFiles.length);
+}
+
+// ── 文件输入 ──
+function triggerFileOpen() { fileInput.click(); }
+fileInput.addEventListener('change', e => loadFiles(e.target.files));
+
+// ── 拖放 ──
+const videoWrap = document.getElementById('videoWrap');
+document.addEventListener('dragover', e => { e.preventDefault(); dropOverlay.classList.add('show'); });
+document.addEventListener('dragleave', e => { if (!e.relatedTarget) dropOverlay.classList.remove('show'); });
+document.addEventListener('drop', e => {
+  e.preventDefault();
+  dropOverlay.classList.remove('show');
+  loadFiles(e.dataTransfer.files);
+});
+
+// ── 播放/暂停 ──
+btnPlay.addEventListener('click', togglePlay);
+videoWrap.addEventListener('click', e => {
+  if (e.target === videoWrap || e.target === video) togglePlay();
+});
+
+function togglePlay() {
+  if (!video.src) return;
+  if (video.paused) { video.play(); showBigPlay(false); }
+  else { video.pause(); showBigPlay(true); }
+}
+
+function showBigPlay(show) {
+  bigPlay.classList.toggle('show', show);
+  if (show) setTimeout(() => bigPlay.classList.remove('show'), 800);
+}
+
+video.addEventListener('play', () => {
+  iconPlay.style.display = 'none';
+  iconPause.style.display = '';
+});
+video.addEventListener('pause', () => {
+  iconPlay.style.display = '';
+  iconPause.style.display = 'none';
+});
+video.addEventListener('ended', () => {
+  iconPlay.style.display = '';
+  iconPause.style.display = 'none';
+  if (isLooping) { video.currentTime = 0; video.play(); }
+  else if (currentIndex + 1 < videoFiles.length) playIndex(currentIndex + 1);
+});
+
+// ── 上一个/下一个 ──
+btnPrev.addEventListener('click', () => { if (currentIndex > 0) playIndex(currentIndex - 1); });
+btnNext.addEventListener('click', () => { if (currentIndex + 1 < videoFiles.length) playIndex(currentIndex + 1); });
+
+// ── 进度条 ──
+video.addEventListener('timeupdate', () => {
+  if (!video.duration) return;
+  const pct = (video.currentTime / video.duration) * 100;
+  progressFilled.style.width = pct + '%';
+  progressThumb.style.left = pct + '%';
+  timeDisplay.textContent = fmtTime(video.currentTime) + ' / ' + fmtTime(video.duration);
+});
+video.addEventListener('progress', () => {
+  if (!video.duration) return;
+  if (video.buffered.length > 0) {
+    const buffered = (video.buffered.end(video.buffered.length - 1) / video.duration) * 100;
+    progressBuffer.style.width = buffered + '%';
+  }
+});
+video.addEventListener('loadedmetadata', () => {
+  timeDisplay.textContent = '0:00 / ' + fmtTime(video.duration);
+  document.getElementById('infoDuration').textContent = fmtTime(video.duration);
+  document.getElementById('infoRes').textContent = video.videoWidth + '×' + video.videoHeight;
+  qualityBadge.textContent = video.videoHeight ? video.videoHeight + 'p' : '-';
+  const f = videoFiles[currentIndex];
+  if (f) f.duration = video.duration;
+  renderPlaylist();
+});
+
+progressArea.addEventListener('mousemove', e => {
+  const rect = progressArea.getBoundingClientRect();
+  const pct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+  timeTooltip.textContent = fmtTime(pct * (video.duration || 0));
+  timeTooltip.style.left = (pct * 100) + '%';
+});
+progressArea.addEventListener('click', e => {
+  if (!video.duration) return;
+  const rect = progressArea.getBoundingClientRect();
+  const pct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+  video.currentTime = pct * video.duration;
+});
+
+// 拖动进度
+let seekDragging = false;
+progressArea.addEventListener('mousedown', e => { seekDragging = true; seekTo(e); });
+document.addEventListener('mousemove', e => { if (seekDragging) seekTo(e); });
+document.addEventListener('mouseup', () => { seekDragging = false; });
+function seekTo(e) {
+  if (!video.duration) return;
+  const rect = progressArea.getBoundingClientRect();
+  const pct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+  video.currentTime = pct * video.duration;
+}
+
+// ── 音量 ──
+volumeSlider.addEventListener('input', () => {
+  video.volume = parseFloat(volumeSlider.value);
+  video.muted = video.volume === 0;
+  updateVolIcon();
+  document.getElementById('infoVol').textContent = Math.round(video.volume * 100) + '%';
+});
+btnMute.addEventListener('click', () => {
+  video.muted = !video.muted;
+  updateVolIcon();
+});
+function updateVolIcon() {
+  const muted = video.muted || video.volume === 0;
+  iconVol.style.display = muted ? 'none' : '';
+  iconMuted.style.display = muted ? '' : 'none';
+}
+
+// ── 播放速度 ──
+speedSelect.addEventListener('change', () => {
+  video.playbackRate = parseFloat(speedSelect.value);
+  document.getElementById('infoSpeed').textContent = speedSelect.value + 'x';
+});
+
+// ── 循环 ──
+btnLoop.addEventListener('click', () => {
+  isLooping = !isLooping;
+  btnLoop.classList.toggle('active', isLooping);
+  document.getElementById('infoLoop').textContent = isLooping ? '开启' : '关闭';
+});
+
+// ── 画中画 ──
+btnPip.addEventListener('click', async () => {
+  if (!video.src) return;
+  try {
+    if (document.pictureInPictureElement) await document.exitPictureInPicture();
+    else await video.requestPictureInPicture();
+  } catch(e) { console.log('PiP not supported'); }
+});
+
+// ── 全屏 ──
+function toggleFullscreen() {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else videoWrap.requestFullscreen();
+}
+document.getElementById('btnFullscreen').addEventListener('click', toggleFullscreen);
+document.getElementById('btnFullscreen2').addEventListener('click', toggleFullscreen);
+
+// ── 截图 ──
+document.getElementById('btnSnapshot').addEventListener('click', takeSnapshot);
+function takeSnapshot() {
+  if (!video.src || !video.videoWidth) return;
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0);
+  canvas.toBlob(blob => {
+    const item = new ClipboardItem({ 'image/png': blob });
+    navigator.clipboard.write([item]).then(() => {
+      showToast('📸 截图已复制到剪贴板');
+    }).catch(() => {
+      // 降级：下载
+      const a = document.createElement('a');
+      a.href = canvas.toDataURL('image/png');
+      a.download = 'snapshot_' + fmtTime(video.currentTime).replace(/:/g,'-') + '.png';
+      a.click();
+      showToast('📸 截图已下载');
+    });
+  });
+}
+function showToast(msg) {
+  snapshotToast.textContent = msg;
+  snapshotToast.classList.add('show');
+  setTimeout(() => snapshotToast.classList.remove('show'), 2000);
+}
+
+// ── 侧边栏 Tab ──
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+  });
+});
+
+// ── 搜索 ──
+searchInput.addEventListener('input', renderPlaylist);
+
+// ── 键盘快捷键 ──
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  switch(e.key) {
+    case ' ': e.preventDefault(); togglePlay(); break;
+    case 'ArrowRight': video.currentTime = Math.min(video.duration, video.currentTime + 5); break;
+    case 'ArrowLeft': video.currentTime = Math.max(0, video.currentTime - 5); break;
+    case 'ArrowUp': e.preventDefault(); volumeSlider.value = Math.min(1, parseFloat(volumeSlider.value) + 0.1); volumeSlider.dispatchEvent(new Event('input')); break;
+    case 'ArrowDown': e.preventDefault(); volumeSlider.value = Math.max(0, parseFloat(volumeSlider.value) - 0.1); volumeSlider.dispatchEvent(new Event('input')); break;
+    case 'f': case 'F': toggleFullscreen(); break;
+    case 'm': case 'M': btnMute.click(); break;
+    case 'l': case 'L': btnLoop.click(); break;
+    case 'n': case 'N': btnNext.click(); break;
+    case 'p': case 'P': btnPrev.click(); break;
+  }
+});
+
+// ── 初始化 ──
+renderPlaylist();
+
+// ── URL嵌入模式 ──
+let lastLoadedUrl = '';
+let isUrlMode = false;
+
+function showUrlInput() {
+  document.getElementById('urlInputContainer').classList.add('show');
+  document.getElementById('urlInput').focus();
+}
+
+function exitUrlMode() {
+  document.getElementById('urlInputContainer').classList.remove('show');
+  document.getElementById('urlInput').value = '';
+  document.getElementById('iframeContainer').classList.remove('show');
+  document.getElementById('iframeError').classList.remove('show');
+  document.getElementById('urlIframe').src = 'about:blank';
+  document.getElementById('videoWrap').querySelector('video').style.display = '';
+  isUrlMode = false;
+}
+
+function loadUrl() {
+  const input = document.getElementById('urlInput');
+  let url = input.value.trim();
+  if (!url) return;
+
+  // 自动补全协议
+  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+  lastLoadedUrl = url;
+
+  const videoWrap = document.getElementById('videoWrap');
+  const iframeContainer = document.getElementById('iframeContainer');
+  const iframe = document.getElementById('urlIframe');
+  const iframeError = document.getElementById('iframeError');
+  const mainVideo = document.getElementById('mainVideo');
+
+  // 切换视图
+  mainVideo.style.display = 'none';
+  iframeContainer.classList.add('show');
+  iframeError.classList.remove('show');
+  isUrlMode = true;
+
+  iframe.onload = function() {
+    iframeError.classList.remove('show');
+  };
+  iframe.onerror = function() {
+    iframeError.classList.add('show');
+  };
+
+  // 超时检测（某些网站会静默阻止）
+  setTimeout(() => {
+    try {
+      // 检测iframe是否真的有内容
+      if (iframeContainer.classList.contains('show')) {
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+        if (!iframeDoc || iframeDoc.body.innerHTML === '' || iframeDoc.title === '') {
+          iframeError.classList.add('show');
+        }
+      }
+    } catch (e) {
+      // 跨域访问会抛异常，这是正常的（大部分网站会阻止）
+      // 只有在没有加载任何内容时才显示错误
+      const hint = document.getElementById('iframeHint');
+      if (url.includes('iqiyi') || url.includes('youku') || url.includes('v.qq') || url.includes('tencent')) {
+        hint.textContent = '该平台禁止嵌入，请点击下方"在新标签页打开"';
+      } else {
+        hint.textContent = '该网站禁止被嵌入iframe，请点击下方"在新标签页打开"';
+      }
+      iframeError.classList.add('show');
+    }
+  }, 3000);
+
+  iframe.src = url;
+}
+
+// 回车触发播放
+document.getElementById('urlInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') loadUrl();
+});
+
+// 切换到本地模式时退出URL模式
+document.querySelector('.open-file-btn') && document.querySelector('.open-file-btn').addEventListener('click', () => {
+  if (isUrlMode) exitUrlMode();
+}, true);
+</script>
+</body>
+</html>
