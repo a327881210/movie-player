@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>视频播放器</title>
+  <title>资料库</title>
   <style>
     :root {
       --bg: #0f0f13;
@@ -15,7 +15,7 @@
       --text: #e8e8f0;
       --muted: #7a7a9a;
       --border: #2d2d3e;
-      --progress: #6c63ff;
+      --success: #4ade80;
       --radius: 12px;
     }
 
@@ -25,10 +25,8 @@
       font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
       background: var(--bg);
       color: var(--text);
-      height: 100vh;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
+      min-height: 100vh;
+      overflow-x: hidden;
     }
 
     /* ── 顶栏 ── */
@@ -40,8 +38,9 @@
       height: 56px;
       background: var(--panel);
       border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-      z-index: 10;
+      position: sticky;
+      top: 0;
+      z-index: 100;
     }
     .logo {
       display: flex;
@@ -49,9 +48,14 @@
       gap: 10px;
       font-size: 18px;
       font-weight: 700;
-      letter-spacing: 0.5px;
     }
     .logo svg { color: var(--accent); }
+
+    .search-wrap {
+      flex: 1;
+      max-width: 480px;
+      margin: 0 24px;
+    }
     .search-bar {
       display: flex;
       align-items: center;
@@ -60,7 +64,6 @@
       border-radius: 24px;
       padding: 6px 16px;
       gap: 8px;
-      width: 300px;
       transition: border-color 0.2s;
     }
     .search-bar:focus-within { border-color: var(--accent); }
@@ -73,421 +76,10 @@
       width: 100%;
     }
     .search-bar input::placeholder { color: var(--muted); }
-    .header-actions { display: flex; gap: 10px; }
-    .btn-icon {
-      background: var(--card);
-      border: 1px solid var(--border);
-      color: var(--muted);
-      border-radius: 50%;
-      width: 36px; height: 36px;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer;
-      transition: background 0.2s, color 0.2s;
-    }
-    .btn-icon:hover { background: var(--card-hover); color: var(--text); }
 
-    /* ── 主布局 ── */
-    .main {
-      display: flex;
-      flex: 1;
-      overflow: hidden;
-    }
+    .header-actions { display: flex; gap: 10px; align-items: center; }
 
-    /* ── 侧边栏 ── */
-    .sidebar {
-      width: 260px;
-      background: var(--panel);
-      border-right: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      flex-shrink: 0;
-      overflow: hidden;
-    }
-    .sidebar-tabs {
-      display: flex;
-      border-bottom: 1px solid var(--border);
-    }
-    .tab {
-      flex: 1;
-      padding: 12px 0;
-      text-align: center;
-      font-size: 13px;
-      color: var(--muted);
-      cursor: pointer;
-      border-bottom: 2px solid transparent;
-      transition: all 0.2s;
-    }
-    .tab.active {
-      color: var(--accent);
-      border-bottom-color: var(--accent);
-    }
-    .playlist {
-      flex: 1;
-      overflow-y: auto;
-      padding: 8px;
-    }
-    .playlist::-webkit-scrollbar { width: 4px; }
-    .playlist::-webkit-scrollbar-track { background: transparent; }
-    .playlist::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-    .playlist-item {
-      display: flex;
-      gap: 10px;
-      padding: 10px;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: background 0.15s;
-      align-items: flex-start;
-    }
-    .playlist-item:hover { background: var(--card-hover); }
-    .playlist-item.active { background: var(--card); }
-    .playlist-item.active .item-title { color: var(--accent); }
-
-    .thumb-wrap {
-      position: relative;
-      flex-shrink: 0;
-      width: 80px; height: 50px;
-      border-radius: 6px;
-      overflow: hidden;
-      background: #111;
-    }
-    .thumb-wrap img { width: 100%; height: 100%; object-fit: cover; }
-    .thumb-duration {
-      position: absolute;
-      bottom: 2px; right: 4px;
-      background: rgba(0,0,0,0.75);
-      color: #fff;
-      font-size: 10px;
-      padding: 1px 4px;
-      border-radius: 3px;
-    }
-    .item-info { flex: 1; min-width: 0; }
-    .item-title {
-      font-size: 12px;
-      line-height: 1.4;
-      color: var(--text);
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
-    .item-meta { font-size: 11px; color: var(--muted); margin-top: 4px; }
-
-    /* ── 播放区 ── */
-    .player-area {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      background: #000;
-    }
-
-    .video-wrap {
-      position: relative;
-      flex: 1;
-      background: #000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-      cursor: pointer;
-    }
-
-    video {
-      max-width: 100%;
-      max-height: 100%;
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      display: block;
-    }
-
-    /* 大播放按钮 */
-    .big-play {
-      position: absolute;
-      width: 72px; height: 72px;
-      border-radius: 50%;
-      background: rgba(108, 99, 255, 0.85);
-      display: flex; align-items: center; justify-content: center;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.25s;
-    }
-    .big-play.show { opacity: 1; }
-    .big-play svg { margin-left: 4px; }
-
-    /* 空状态 */
-    .empty-state {
-      position: absolute;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 16px;
-      color: var(--muted);
-    }
-    .empty-state svg { opacity: 0.3; }
-    .empty-state p { font-size: 14px; }
-
-    /* 文件拖放覆盖层 */
-    .drop-overlay {
-      position: absolute;
-      inset: 0;
-      background: rgba(108,99,255,0.15);
-      border: 3px dashed var(--accent);
-      border-radius: 4px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--accent);
-      font-size: 18px;
-      font-weight: 600;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.2s;
-    }
-    .drop-overlay.show { opacity: 1; }
-
-    /* ── 控制栏 ── */
-    .controls {
-      background: var(--panel);
-      border-top: 1px solid var(--border);
-      padding: 0 20px 12px;
-      flex-shrink: 0;
-    }
-
-    /* 进度条 */
-    .progress-area {
-      padding: 10px 0 4px;
-      cursor: pointer;
-      position: relative;
-    }
-    .progress-track {
-      height: 4px;
-      background: var(--border);
-      border-radius: 2px;
-      position: relative;
-      overflow: hidden;
-      transition: height 0.15s;
-    }
-    .progress-area:hover .progress-track { height: 6px; }
-    .progress-filled {
-      height: 100%;
-      background: linear-gradient(90deg, var(--accent), #a89fff);
-      border-radius: 2px;
-      width: 0%;
-      pointer-events: none;
-    }
-    .progress-buffer {
-      position: absolute;
-      top: 0; left: 0;
-      height: 100%;
-      background: rgba(255,255,255,0.12);
-      border-radius: 2px;
-      width: 0%;
-      pointer-events: none;
-    }
-    .progress-thumb {
-      position: absolute;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      width: 12px; height: 12px;
-      border-radius: 50%;
-      background: #fff;
-      box-shadow: 0 0 4px rgba(0,0,0,0.5);
-      opacity: 0;
-      transition: opacity 0.15s;
-      pointer-events: none;
-    }
-    .progress-area:hover .progress-thumb { opacity: 1; }
-
-    /* 时间提示 */
-    .time-tooltip {
-      position: absolute;
-      top: -28px;
-      transform: translateX(-50%);
-      background: rgba(0,0,0,0.85);
-      color: #fff;
-      font-size: 11px;
-      padding: 2px 6px;
-      border-radius: 4px;
-      pointer-events: none;
-      opacity: 0;
-      white-space: nowrap;
-    }
-    .progress-area:hover .time-tooltip { opacity: 1; }
-
-    /* 底部按钮行 */
-    .ctrl-row {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      margin-top: 4px;
-    }
-    .ctrl-btn {
-      background: none;
-      border: none;
-      color: var(--muted);
-      cursor: pointer;
-      padding: 6px;
-      border-radius: 6px;
-      display: flex; align-items: center; justify-content: center;
-      transition: color 0.15s, background 0.15s;
-      font-size: 12px;
-    }
-    .ctrl-btn:hover { color: var(--text); background: var(--card); }
-    .ctrl-btn.active { color: var(--accent); }
-
-    .play-btn {
-      width: 40px; height: 40px;
-      border-radius: 50%;
-      background: var(--accent);
-      color: #fff;
-      border: none;
-      cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      transition: background 0.15s, transform 0.1s;
-      margin: 0 4px;
-    }
-    .play-btn:hover { background: #7c74ff; transform: scale(1.05); }
-    .play-btn:active { transform: scale(0.96); }
-
-    .time-display {
-      font-size: 12px;
-      color: var(--muted);
-      margin: 0 8px;
-      white-space: nowrap;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .spacer { flex: 1; }
-
-    /* 音量 */
-    .volume-wrap {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .volume-slider {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 70px;
-      height: 4px;
-      border-radius: 2px;
-      background: var(--border);
-      outline: none;
-      cursor: pointer;
-    }
-    .volume-slider::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 12px; height: 12px;
-      border-radius: 50%;
-      background: var(--accent);
-      cursor: pointer;
-    }
-    .volume-slider::-moz-range-thumb {
-      width: 12px; height: 12px;
-      border-radius: 50%;
-      background: var(--accent);
-      cursor: pointer;
-      border: none;
-    }
-
-    /* 速度选择 */
-    .speed-select {
-      background: var(--card);
-      border: 1px solid var(--border);
-      color: var(--text);
-      border-radius: 6px;
-      padding: 4px 8px;
-      font-size: 12px;
-      cursor: pointer;
-      outline: none;
-    }
-    .speed-select:focus { border-color: var(--accent); }
-
-    /* 画质标签 */
-    .quality-badge {
-      background: var(--card);
-      border: 1px solid var(--border);
-      color: var(--muted);
-      font-size: 11px;
-      padding: 3px 8px;
-      border-radius: 4px;
-    }
-
-    /* 视频标题条 */
-    .video-title-bar {
-      background: var(--panel);
-      border-bottom: 1px solid var(--border);
-      padding: 10px 20px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-shrink: 0;
-    }
-    .video-title {
-      font-size: 14px;
-      font-weight: 600;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 60%;
-    }
-    .video-subtitle { font-size: 12px; color: var(--muted); margin-top: 2px; }
-
-    /* 右侧信息面板 */
-    .info-panel {
-      width: 240px;
-      background: var(--panel);
-      border-left: 1px solid var(--border);
-      flex-shrink: 0;
-      display: flex;
-      flex-direction: column;
-      overflow-y: auto;
-      padding: 16px;
-      gap: 16px;
-    }
-    .info-panel::-webkit-scrollbar { width: 4px; }
-    .info-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-    .info-section h4 {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      color: var(--muted);
-      margin-bottom: 10px;
-    }
-    .info-row {
-      display: flex;
-      justify-content: space-between;
-      font-size: 12px;
-      padding: 5px 0;
-      border-bottom: 1px solid var(--border);
-    }
-    .info-row:last-child { border-bottom: none; }
-    .info-label { color: var(--muted); }
-    .info-value { color: var(--text); font-weight: 500; }
-
-    /* 开场动效 */
-    @keyframes fadeIn { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform: none; } }
-    .player-area, .sidebar, .info-panel { animation: fadeIn 0.4s ease; }
-
-    /* 全屏适配 */
-    .video-wrap:fullscreen video { width: 100%; height: 100%; }
-
-    /* 响应式 */
-    @media (max-width: 900px) {
-      .info-panel { display: none; }
-      .sidebar { width: 200px; }
-    }
-    @media (max-width: 600px) {
-      .sidebar { display: none; }
-      .search-bar { display: none; }
-    }
-
-    /* 打开文件按钮 */
-    .open-file-btn {
+    .btn-primary {
       display: inline-flex;
       align-items: center;
       gap: 8px;
@@ -495,101 +87,425 @@
       color: #fff;
       border: none;
       border-radius: 8px;
-      padding: 10px 20px;
+      padding: 8px 18px;
       font-size: 14px;
       font-weight: 600;
       cursor: pointer;
       transition: background 0.15s, transform 0.1s;
     }
-    .open-file-btn:hover { background: #7c74ff; }
-    .open-file-btn:active { transform: scale(0.97); }
+    .btn-primary:hover { background: #7c74ff; transform: scale(1.02); }
+    .btn-primary:active { transform: scale(0.97); }
 
-    /* 截图提示 */
-    .snapshot-toast {
-      position: fixed;
-      top: 70px;
-      right: 20px;
-      background: var(--accent);
-      color: #fff;
-      padding: 8px 16px;
-      border-radius: 8px;
-      font-size: 13px;
-      opacity: 0;
-      transition: opacity 0.3s;
-      pointer-events: none;
-      z-index: 999;
-    }
-    .snapshot-toast.show { opacity: 1; }
-
-    /* URL嵌入模式 */
-    #urlInputContainer {
-      display: none;
-      align-items: center;
-      gap: 8px;
-      padding: 12px 16px;
-      background: var(--panel);
-      border-bottom: 1px solid var(--border);
-    }
-    #urlInputContainer.show { display: flex; }
-    #urlInput {
-      flex: 1;
+    .btn-ghost {
       background: var(--card);
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 8px 14px;
-      color: var(--text);
-      font-size: 13px;
-      outline: none;
-    }
-    #urlInput:focus { border-color: var(--accent); }
-    #urlInput::placeholder { color: var(--muted); }
-    .url-btn {
-      background: var(--accent);
-      color: #fff;
-      border: none;
+      color: var(--muted);
       border-radius: 8px;
       padding: 8px 14px;
       font-size: 13px;
       cursor: pointer;
-      white-space: nowrap;
-      transition: background 0.15s;
+      display: flex; align-items: center; gap: 6px;
+      transition: background 0.15s, color 0.15s;
     }
-    .url-btn:hover { background: #7c74ff; }
-    .url-btn.cancel-btn { background: var(--card); color: var(--muted); border: 1px solid var(--border); }
-    .url-btn.cancel-btn:hover { background: var(--card-hover); color: var(--text); }
+    .btn-ghost:hover { background: var(--card-hover); color: var(--text); }
 
-    /* iframe容器 */
-    #iframeContainer {
-      display: none;
-      width: 100%;
-      height: 100%;
-      background: #000;
+    /* ── 统计栏 ── */
+    .stats-bar {
+      display: flex;
+      gap: 0;
+      padding: 16px 24px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
     }
-    #iframeContainer.show { display: block; }
-    #iframeContainer iframe {
-      width: 100%;
-      height: 100%;
-      border: none;
-    }
-
-    /* iframe错误提示 */
-    .iframe-error {
-      position: absolute;
-      inset: 0;
-      display: none;
+    .stat-item {
+      display: flex;
       flex-direction: column;
+      padding: 0 24px;
+      border-right: 1px solid var(--border);
+    }
+    .stat-item:first-child { padding-left: 0; }
+    .stat-item:last-child { border-right: none; }
+    .stat-num { font-size: 22px; font-weight: 700; color: var(--accent); }
+    .stat-label { font-size: 11px; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 1px; }
+
+    /* ── 标签筛选 ── */
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 24px;
+      overflow-x: auto;
+      border-bottom: 1px solid var(--border);
+    }
+    .filter-bar::-webkit-scrollbar { height: 0; }
+    .filter-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--muted);
+      transition: all 0.15s;
+    }
+    .filter-tag:hover { border-color: var(--accent); color: var(--accent); }
+    .filter-tag.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .filter-tag .count {
+      background: rgba(255,255,255,0.15);
+      border-radius: 10px;
+      padding: 1px 6px;
+      font-size: 10px;
+    }
+    .filter-tag.active .count { background: rgba(255,255,255,0.25); }
+
+    /* ── 主区域 ── */
+    .main-content {
+      padding: 20px 24px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    /* ── 上传区域 ── */
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 48px 24px;
+      text-align: center;
+      transition: all 0.2s;
+      cursor: pointer;
+      margin-bottom: 24px;
+      background: var(--panel);
+    }
+    .upload-zone:hover, .upload-zone.dragover {
+      border-color: var(--accent);
+      background: rgba(108,99,255,0.05);
+    }
+    .upload-zone-icon { font-size: 48px; margin-bottom: 16px; }
+    .upload-zone h3 { font-size: 16px; margin-bottom: 8px; }
+    .upload-zone p { font-size: 13px; color: var(--muted); }
+    .upload-zone .hint { font-size: 11px; color: var(--muted); margin-top: 10px; }
+
+    /* ── 排序/视图切换 ── */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .toolbar-left { font-size: 13px; color: var(--muted); }
+    .toolbar-right { display: flex; gap: 8px; align-items: center; }
+    .sort-select {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      outline: none;
+    }
+    .view-btn {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 8px;
+      width: 32px; height: 32px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .view-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+    /* ── 文件网格 ── */
+    .file-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 16px;
+    }
+    .file-grid.list-view {
+      grid-template-columns: 1fr;
+      gap: 6px;
+    }
+
+    /* ── 文件卡片 ── */
+    .file-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.15s;
+      position: relative;
+    }
+    .file-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(108,99,255,0.15);
+    }
+    .file-card.selected {
+      border-color: var(--accent);
+      background: rgba(108,99,255,0.08);
+    }
+
+    /* 缩略图区 */
+    .file-thumb {
+      height: 140px;
+      background: linear-gradient(135deg, #1e1e2e, #2a2a3a);
+      display: flex;
       align-items: center;
       justify-content: center;
-      background: #111;
+      font-size: 48px;
+      position: relative;
+      overflow: hidden;
+    }
+    .file-thumb img {
+      width: 100%; height: 100%;
+      object-fit: cover;
+    }
+    .file-thumb .ext-badge {
+      position: absolute;
+      top: 8px; right: 8px;
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+    .file-thumb .play-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .file-card:hover .play-overlay { opacity: 1; }
+    .file-thumb .play-overlay span {
+      background: var(--accent);
+      border-radius: 50%;
+      width: 44px; height: 44px;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff;
+      font-size: 18px;
+    }
+
+    /* 复选框 */
+    .file-check {
+      position: absolute;
+      top: 8px; left: 8px;
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.5);
+      border: 2px solid rgba(255,255,255,0.5);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0;
+      transition: all 0.15s;
+      z-index: 2;
+    }
+    .file-card:hover .file-check,
+    .file-card.selected .file-check { opacity: 1; }
+    .file-card.selected .file-check {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+    .file-check svg { width: 12px; height: 12px; color: #fff; display: none; }
+    .file-card.selected .file-check svg { display: block; }
+
+    /* 文件信息 */
+    .file-info {
+      padding: 12px;
+    }
+    .file-name {
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 6px;
+    }
+    .file-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .file-size { color: var(--muted); }
+    .file-date { font-size: 10px; color: var(--muted); }
+
+    /* 列表视图样式 */
+    .file-grid.list-view .file-card {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      border-radius: 8px;
+    }
+    .file-grid.list-view .file-thumb {
+      width: 52px; height: 52px;
+      border-radius: 8px;
+      margin: 8px 0 8px 8px;
+      flex-shrink: 0;
+      font-size: 24px;
+    }
+    .file-grid.list-view .file-info {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .file-grid.list-view .file-name { flex: 1; margin-bottom: 0; }
+    .file-grid.list-view .file-meta { flex-shrink: 0; }
+    .file-grid.list-view .ext-badge { display: none; }
+
+    /* ── 右键菜单 ── */
+    .context-menu {
+      position: fixed;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 6px 0;
+      min-width: 160px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      z-index: 1000;
+      display: none;
+    }
+    .context-menu.show { display: block; }
+    .context-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 16px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.1s;
+      color: var(--text);
+    }
+    .context-item:hover { background: var(--card-hover); }
+    .context-item.danger { color: #ff6b6b; }
+    .context-item.danger:hover { background: rgba(255,107,107,0.1); }
+    .context-divider { height: 1px; background: var(--border); margin: 4px 0; }
+
+    /* ── 预览面板 ── */
+    .preview-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      z-index: 200;
+      display: none;
+      flex-direction: column;
+    }
+    .preview-overlay.show { display: flex; }
+    .preview-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+    }
+    .preview-title { font-size: 14px; font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .preview-actions { display: flex; gap: 10px; }
+    .preview-body {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: auto;
+      padding: 20px;
+    }
+    .preview-body img { max-width: 100%; max-height: calc(100vh - 140px); border-radius: 8px; object-fit: contain; }
+    .preview-body video, .preview-body audio { max-width: 100%; width: 100%; }
+    .preview-body iframe { width: 100%; height: calc(100vh - 140px); border: none; }
+    .preview-no-support {
       color: var(--muted);
       text-align: center;
       padding: 40px;
-      gap: 16px;
-      z-index: 10;
     }
-    .iframe-error.show { display: flex; }
-    .iframe-error p { font-size: 14px; line-height: 1.6; max-width: 480px; }
-    .iframe-error .hint { font-size: 12px; color: var(--accent); margin-top: 4px; }
+    .preview-no-support p { margin-bottom: 16px; }
+    .preview-info {
+      background: var(--panel);
+      border-top: 1px solid var(--border);
+      padding: 12px 20px;
+      display: flex;
+      gap: 24px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .preview-info span b { color: var(--text); margin-left: 6px; }
+
+    /* ── 上传进度 ── */
+    .upload-progress {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      margin-bottom: 12px;
+      display: none;
+    }
+    .upload-progress.show { display: block; }
+    .upload-progress-name { font-size: 13px; font-weight: 600; margin-bottom: 8px; display: flex; justify-content: space-between; }
+    .upload-progress-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+    .upload-progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), #a89fff); border-radius: 3px; width: 0%; transition: width 0.3s; }
+
+    /* ── 空状态 ── */
+    .empty-state {
+      text-align: center;
+      padding: 80px 20px;
+      color: var(--muted);
+    }
+    .empty-state svg { opacity: 0.2; margin-bottom: 16px; }
+    .empty-state h3 { font-size: 16px; margin-bottom: 8px; color: var(--text); }
+    .empty-state p { font-size: 13px; }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 18px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      z-index: 999;
+      opacity: 0;
+      transform: translateY(20px);
+      transition: all 0.3s;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: none; pointer-events: auto; }
+    .toast.success { border-color: var(--success); }
+    .toast.error { border-color: var(--accent2); }
+
+    /* ── 动画 ── */
+    @keyframes fadeIn { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform: none; } }
+    .file-card { animation: fadeIn 0.3s ease; }
+
+    /* ── 滚动条 ── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* 移动端 */
+    @media (max-width: 600px) {
+      .stats-bar { padding: 12px 16px; gap: 0; }
+      .stat-item { padding: 0 12px; }
+      .stat-num { font-size: 18px; }
+      .main-content { padding: 16px; }
+      .search-wrap { display: none; }
+      header { padding: 0 16px; }
+    }
   </style>
 </head>
 <body>
@@ -598,679 +514,607 @@
 <header>
   <div class="logo">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm8 3L9 9h2v6h2V9h2L12 7z"/>
+      <path d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-6 10H6v-2h8v2zm4-4H6V8h12v4z"/>
     </svg>
-    视频播放器
+    资料库
   </div>
 
-  <div style="display:flex;align-items:center;gap:8px;flex:1;max-width:500px;margin:0 20px;">
-    <div class="search-bar" style="flex:1">
+  <div class="search-wrap">
+    <div class="search-bar">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
       </svg>
-      <input type="text" placeholder="搜索视频..." id="searchInput" />
+      <input type="text" placeholder="搜索文件..." id="searchInput" oninput="renderFiles()" />
     </div>
   </div>
 
   <div class="header-actions">
-    <button class="btn-icon" id="btnUrlMode" title="粘贴网址播放" onclick="showUrlInput()" style="background:var(--card);border:1px solid var(--border);color:var(--muted);">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+    <button class="btn-ghost" onclick="sortBy='name'; renderFiles()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
+        <line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/>
+        <line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
       </svg>
+      名称
     </button>
-    <button class="btn-icon" title="打开本地视频" onclick="triggerFileOpen()">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+    <button class="btn-primary" onclick="fileInput.click()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
       </svg>
-    </button>
-    <button class="btn-icon" title="全屏" id="btnFullscreen">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/>
-        <line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
-      </svg>
-    </button>
-    <button class="btn-icon" title="截图" id="btnSnapshot">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-        <circle cx="12" cy="13" r="4"/>
-      </svg>
+      上传文件
     </button>
   </div>
 </header>
 
-<!-- URL输入条 -->
-<div id="urlInputContainer">
-  <input type="text" id="urlInput" placeholder="粘贴网址链接，按回车播放，如 https://..." />
-  <button class="url-btn" onclick="loadUrl()">▶ 播放</button>
-  <button class="url-btn cancel-btn" onclick="exitUrlMode()">✕ 取消</button>
+<!-- 统计栏 -->
+<div class="stats-bar">
+  <div class="stat-item"><div class="stat-num" id="statTotal">0</div><div class="stat-label">全部文件</div></div>
+  <div class="stat-item"><div class="stat-num" id="statSize">0 MB</div><div class="stat-label">总大小</div></div>
+  <div class="stat-item"><div class="stat-num" id="statToday">0</div><div class="stat-label">今日上传</div></div>
 </div>
 
-<div class="main">
-
-  <!-- 左侧播放列表 -->
-  <div class="sidebar">
-    <div class="sidebar-tabs">
-      <div class="tab active" data-tab="playlist">播放列表</div>
-      <div class="tab" data-tab="history">历史记录</div>
-    </div>
-    <div class="playlist" id="playlistEl">
-      <!-- 由 JS 渲染 -->
-    </div>
-  </div>
-
-  <!-- 中间播放区 -->
-  <div class="player-area">
-    <!-- 标题条 -->
-    <div class="video-title-bar">
-      <div>
-        <div class="video-title" id="videoTitle">等待播放...</div>
-        <div class="video-subtitle" id="videoSubtitle">拖入视频文件或点击右上角文件夹图标</div>
-      </div>
-      <div style="display:flex;gap:8px;align-items:center;">
-        <span class="quality-badge" id="qualityBadge">-</span>
-      </div>
-    </div>
-
-    <!-- 视频画面 -->
-    <div class="video-wrap" id="videoWrap">
-      <video id="mainVideo" preload="metadata"></video>
-
-      <div class="big-play" id="bigPlay">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="#fff">
-          <polygon points="5 3 19 12 5 21 5 3"/>
-        </svg>
-      </div>
-
-      <div class="empty-state" id="emptyState">
-        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
-          <path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.95C18.88 4 12 4 12 4s-6.88 0-8.59.47A2.78 2.78 0 0 0 1.46 6.42 29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.41 19.08C5.12 19.55 12 19.55 12 19.55s6.88 0 8.59-.47a2.78 2.78 0 0 0 1.95-1.95A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"/>
-          <polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="currentColor"/>
-        </svg>
-        <p>拖入视频开始播放</p>
-        <button class="open-file-btn" onclick="triggerFileOpen()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-          </svg>
-          打开本地视频
-        </button>
-      </div>
-
-      <div class="drop-overlay" id="dropOverlay">松开鼠标以播放</div>
-
-      <!-- iframe嵌入容器 -->
-      <div id="iframeContainer">
-        <iframe id="urlIframe" allow="autoplay; fullscreen" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
-        <div class="iframe-error" id="iframeError">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="opacity:0.4">
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="12" y1="8" x2="12" y2="12"/>
-            <line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
-          <p>无法加载此页面<br>该网站可能禁止了嵌入，或需要登录/付费</p>
-          <p class="hint" id="iframeHint">提示：爱奇艺、优酷、腾讯视频等平台禁止嵌入，请直接访问原站</p>
-          <div style="display:flex;gap:10px;margin-top:8px">
-            <button class="url-btn" onclick="loadUrlViaProxy(lastLoadedUrl)">🔄 代理模式尝试</button>
-            <button class="url-btn cancel-btn" onclick="window.open(lastLoadedUrl, '_blank')">↗ 在新标签页打开</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 控制栏 -->
-    <div class="controls">
-      <!-- 进度条 -->
-      <div class="progress-area" id="progressArea">
-        <div class="progress-track">
-          <div class="progress-buffer" id="progressBuffer"></div>
-          <div class="progress-filled" id="progressFilled"></div>
-        </div>
-        <div class="progress-thumb" id="progressThumb"></div>
-        <div class="time-tooltip" id="timeTooltip">0:00</div>
-      </div>
-
-      <!-- 按钮行 -->
-      <div class="ctrl-row">
-        <!-- 上一个 -->
-        <button class="ctrl-btn" title="上一个" id="btnPrev">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-            <polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="2"/>
-          </svg>
-        </button>
-
-        <!-- 播放/暂停 -->
-        <button class="play-btn" id="btnPlay">
-          <svg id="iconPlay" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-            <polygon points="5 3 19 12 5 21 5 3"/>
-          </svg>
-          <svg id="iconPause" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display:none">
-            <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
-          </svg>
-        </button>
-
-        <!-- 下一个 -->
-        <button class="ctrl-btn" title="下一个" id="btnNext">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-            <polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2"/>
-          </svg>
-        </button>
-
-        <!-- 时间 -->
-        <span class="time-display" id="timeDisplay">0:00 / 0:00</span>
-
-        <div class="spacer"></div>
-
-        <!-- 循环 -->
-        <button class="ctrl-btn" title="循环" id="btnLoop">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/>
-            <polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
-          </svg>
-        </button>
-
-        <!-- 速度 -->
-        <select class="speed-select" id="speedSelect">
-          <option value="0.5">0.5x</option>
-          <option value="0.75">0.75x</option>
-          <option value="1" selected>1.0x</option>
-          <option value="1.25">1.25x</option>
-          <option value="1.5">1.5x</option>
-          <option value="2">2.0x</option>
-        </select>
-
-        <!-- 音量 -->
-        <div class="volume-wrap">
-          <button class="ctrl-btn" title="静音" id="btnMute">
-            <svg id="iconVol" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-              <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
-              <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
-            </svg>
-            <svg id="iconMuted" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none">
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-              <line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>
-            </svg>
-          </button>
-          <input type="range" class="volume-slider" id="volumeSlider" min="0" max="1" step="0.02" value="1" />
-        </div>
-
-        <!-- 画中画 -->
-        <button class="ctrl-btn" title="画中画" id="btnPip">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="2" y="3" width="20" height="14" rx="2"/><rect x="12" y="10" width="8" height="5" rx="1"/>
-          </svg>
-        </button>
-
-        <!-- 全屏 -->
-        <button class="ctrl-btn" title="全屏" id="btnFullscreen2">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/>
-            <line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
-          </svg>
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 右侧信息面板 -->
-  <div class="info-panel" id="infoPanel">
-    <div class="info-section">
-      <h4>视频信息</h4>
-      <div class="info-row"><span class="info-label">文件名</span><span class="info-value" id="infoName">-</span></div>
-      <div class="info-row"><span class="info-label">时长</span><span class="info-value" id="infoDuration">-</span></div>
-      <div class="info-row"><span class="info-label">分辨率</span><span class="info-value" id="infoRes">-</span></div>
-      <div class="info-row"><span class="info-label">大小</span><span class="info-value" id="infoSize">-</span></div>
-    </div>
-    <div class="info-section">
-      <h4>播放状态</h4>
-      <div class="info-row"><span class="info-label">当前速度</span><span class="info-value" id="infoSpeed">1.0x</span></div>
-      <div class="info-row"><span class="info-label">循环模式</span><span class="info-value" id="infoLoop">关闭</span></div>
-      <div class="info-row"><span class="info-label">音量</span><span class="info-value" id="infoVol">100%</span></div>
-    </div>
-    <div class="info-section">
-      <h4>快捷键</h4>
-      <div class="info-row"><span class="info-label">空格</span><span class="info-value">播放/暂停</span></div>
-      <div class="info-row"><span class="info-label">← →</span><span class="info-value">快退/快进 5s</span></div>
-      <div class="info-row"><span class="info-label">↑ ↓</span><span class="info-value">音量 ±10%</span></div>
-      <div class="info-row"><span class="info-label">F</span><span class="info-value">全屏</span></div>
-      <div class="info-row"><span class="info-label">M</span><span class="info-value">静音</span></div>
-      <div class="info-row"><span class="info-label">L</span><span class="info-value">循环切换</span></div>
-    </div>
-  </div>
-
+<!-- 标签筛选 -->
+<div class="filter-bar">
+  <span class="filter-tag active" data-type="all" onclick="setFilter('all', this)">全部 <span class="count" id="cntAll">0</span></span>
+  <span class="filter-tag" data-type="doc" onclick="setFilter('doc', this)">📄 文档 <span class="count" id="cntDoc">0</span></span>
+  <span class="filter-tag" data-type="image" onclick="setFilter('image', this)">🖼️ 图片 <span class="count" id="cntImg">0</span></span>
+  <span class="filter-tag" data-type="video" onclick="setFilter('video', this)">🎬 视频 <span class="count" id="cntVid">0</span></span>
+  <span class="filter-tag" data-type="audio" onclick="setFilter('audio', this)">🎵 音频 <span class="count" id="cntAud">0</span></span>
+  <span class="filter-tag" data-type="zip" onclick="setFilter('zip', this)">📦 压缩包 <span class="count" id="cntZip">0</span></span>
+  <span class="filter-tag" data-type="other" onclick="setFilter('other', this)">📎 其他 <span class="count" id="cntOther">0</span></span>
 </div>
 
-<!-- 截图提示 -->
-<div class="snapshot-toast" id="snapshotToast">📸 截图已复制到剪贴板</div>
+<!-- 主区域 -->
+<div class="main-content">
+
+  <!-- 上传区 -->
+  <div class="upload-zone" id="uploadZone" onclick="fileInput.click()">
+    <div class="upload-zone-icon">📂</div>
+    <h3>点击上传或将文件拖入此处</h3>
+    <p>支持：文档、图片、视频、音频、压缩包等任意文件</p>
+    <p class="hint">单个文件最大 500MB · 无数量限制 · 本地存储不上传服务器</p>
+  </div>
+
+  <!-- 进度条 -->
+  <div class="upload-progress" id="uploadProgress">
+    <div class="upload-progress-name">
+      <span id="uploadFileName">-</span>
+      <span id="uploadPercent" style="color:var(--accent)">0%</span>
+    </div>
+    <div class="upload-progress-bar"><div class="upload-progress-fill" id="uploadFill"></div></div>
+  </div>
+
+  <!-- 工具栏 -->
+  <div class="toolbar">
+    <div class="toolbar-left" id="toolbarInfo">共 0 个文件</div>
+    <div class="toolbar-right">
+      <select class="sort-select" id="sortSelect" onchange="sortBy=this.value; renderFiles()">
+        <option value="newest">按时间最新</option>
+        <option value="oldest">按时间最旧</option>
+        <option value="name">按名称 A-Z</option>
+        <option value="size">按大小</option>
+        <option value="type">按类型</option>
+      </select>
+      <button class="view-btn active" id="viewGrid" onclick="setView('grid')" title="网格视图">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+      </button>
+      <button class="view-btn" id="viewList" onclick="setView('list')" title="列表视图">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
+          <line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/>
+          <line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- 文件列表 -->
+  <div id="fileGrid" class="file-grid"></div>
+</div>
+
+<!-- 右键菜单 -->
+<div class="context-menu" id="contextMenu">
+  <div class="context-item" onclick="ctxAction('open')">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+      <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+    </svg>
+    打开/预览
+  </div>
+  <div class="context-item" onclick="ctxAction('download')">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+      <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+    </svg>
+    下载
+  </div>
+  <div class="context-item" onclick="ctxAction('copy')">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+    </svg>
+    复制链接
+  </div>
+  <div class="context-divider"></div>
+  <div class="context-item" onclick="ctxAction('rename')">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+    </svg>
+    重命名
+  </div>
+  <div class="context-divider"></div>
+  <div class="context-item danger" onclick="ctxAction('delete')">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+    </svg>
+    删除
+  </div>
+</div>
+
+<!-- 预览面板 -->
+<div class="preview-overlay" id="previewOverlay">
+  <div class="preview-topbar">
+    <div class="preview-title" id="previewTitle">-</div>
+    <div class="preview-actions">
+      <button class="btn-ghost" onclick="downloadFile(ctxIndex)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        下载
+      </button>
+      <button class="btn-ghost" onclick="closePreview()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+        关闭
+      </button>
+    </div>
+  </div>
+  <div class="preview-body" id="previewBody"></div>
+  <div class="preview-info" id="previewInfo"></div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
 
 <!-- 隐藏的文件输入 -->
-<input type="file" id="fileInput" accept="video/*" style="display:none" multiple />
+<input type="file" id="fileInput" style="display:none" multiple onchange="handleFiles(this.files)" />
 
 <script>
 // ── 数据 ──
-const playlist = [
-  { title: "示例：拖入视频文件开始播放", meta: "支持 MP4 / WebM / OGG 等格式", duration: "", thumb: "" },
-];
+const DB_NAME = 'fileLibraryDB';
+const STORE_NAME = 'files';
+let db = null;
+let allFiles = [];
+let currentFilter = 'all';
+let sortBy = 'newest';
+let viewMode = 'grid';
+let ctxIndex = -1;
+let ctxFile = null;
 
-let currentIndex = -1;
-let isDragging = false;
-let isLooping = false;
-let videoFiles = [];
-let historyList = [];
+// ── 初始化 IndexedDB ──
+function initDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onerror = () => reject(req.error);
+    req.onsuccess = () => { db = req.result; resolve(db); };
+    req.onupgradeneeded = e => {
+      const database = e.target.result;
+      if (!database.objectStoreNames.contains(STORE_NAME)) {
+        database.createObjectStore(STORE_NAME, { keyPath: 'id' });
+      }
+    };
+  });
+}
 
-// ── 元素 ──
-const video = document.getElementById('mainVideo');
-const btnPlay = document.getElementById('btnPlay');
-const iconPlay = document.getElementById('iconPlay');
-const iconPause = document.getElementById('iconPause');
-const btnPrev = document.getElementById('btnPrev');
-const btnNext = document.getElementById('btnNext');
-const progressArea = document.getElementById('progressArea');
-const progressFilled = document.getElementById('progressFilled');
-const progressBuffer = document.getElementById('progressBuffer');
-const progressThumb = document.getElementById('progressThumb');
-const timeTooltip = document.getElementById('timeTooltip');
-const timeDisplay = document.getElementById('timeDisplay');
-const volumeSlider = document.getElementById('volumeSlider');
-const btnMute = document.getElementById('btnMute');
-const iconVol = document.getElementById('iconVol');
-const iconMuted = document.getElementById('iconMuted');
-const speedSelect = document.getElementById('speedSelect');
-const btnLoop = document.getElementById('btnLoop');
-const btnPip = document.getElementById('btnPip');
-const emptyState = document.getElementById('emptyState');
-const bigPlay = document.getElementById('bigPlay');
-const dropOverlay = document.getElementById('dropOverlay');
-const playlistEl = document.getElementById('playlistEl');
-const videoTitle = document.getElementById('videoTitle');
-const videoSubtitle = document.getElementById('videoSubtitle');
-const qualityBadge = document.getElementById('qualityBadge');
-const fileInput = document.getElementById('fileInput');
-const snapshotToast = document.getElementById('snapshotToast');
-const searchInput = document.getElementById('searchInput');
+function dbGetAll() {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const store = tx.objectStore(STORE_NAME);
+    const req = store.getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
 
-// ── 格式化时间 ──
-function fmtTime(sec) {
-  if (isNaN(sec)) return '0:00';
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  const s = Math.floor(sec % 60);
-  if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-  return `${m}:${String(s).padStart(2,'0')}`;
+function dbPut(file) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    const req = store.put(file);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function dbDelete(id) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    const req = store.delete(id);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+// ── 文件类型判断 ──
+function getFileType(file) {
+  const t = file.type;
+  const name = file.name.toLowerCase();
+  if (t.startsWith('image/')) return 'image';
+  if (t.startsWith('video/')) return 'video';
+  if (t.startsWith('audio/')) return 'audio';
+  if (t.match(/word|document|text\/plain|text\/html|text\/xml|pdf/)) return 'doc';
+  if (name.endsWith('.zip') || name.endsWith('.rar') || name.endsWith('.7z') || name.endsWith('.tar') || name.endsWith('.gz')) return 'zip';
+  return 'other';
+}
+
+function getFileIcon(type, ext) {
+  const icons = {
+    doc: '📄', image: '🖼️', video: '🎬', audio: '🎵', zip: '📦', other: '📎'
+  };
+  return icons[type] || '📎';
+}
+
+function getFileExt(name) {
+  return name.split('.').pop().toUpperCase().substring(0, 5);
 }
 
 function fmtSize(bytes) {
-  if (!bytes) return '-';
-  if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
-  if (bytes < 1024*1024*1024) return (bytes/1024/1024).toFixed(1) + ' MB';
-  return (bytes/1024/1024/1024).toFixed(2) + ' GB';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  if (bytes < 1024 * 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+  return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' GB';
 }
 
-// ── 渲染播放列表 ──
-function renderPlaylist() {
-  const query = searchInput.value.toLowerCase();
-  playlistEl.innerHTML = '';
-  videoFiles.forEach((file, i) => {
-    if (query && !file.name.toLowerCase().includes(query)) return;
-    const item = document.createElement('div');
-    item.className = 'playlist-item' + (i === currentIndex ? ' active' : '');
-    item.innerHTML = `
-      <div class="thumb-wrap">
-        <div style="width:100%;height:100%;background:linear-gradient(135deg,#1e1e2e,#2a2a3a);display:flex;align-items:center;justify-content:center;">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="#6c63ff"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-        </div>
-        ${file.duration ? `<div class="thumb-duration">${fmtTime(file.duration)}</div>` : ''}
-      </div>
-      <div class="item-info">
-        <div class="item-title">${file.name}</div>
-        <div class="item-meta">${fmtSize(file.size)}</div>
-      </div>`;
-    item.onclick = () => playIndex(i);
-    playlistEl.appendChild(item);
+function fmtDate(ts) {
+  const d = new Date(ts);
+  return d.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
+}
+
+// ── 上传处理 ──
+function handleFiles(files) {
+  if (!files || !files.length) return;
+  const zone = document.getElementById('uploadZone');
+  const progress = document.getElementById('uploadProgress');
+  const fill = document.getElementById('uploadFill');
+  const nameEl = document.getElementById('uploadFileName');
+  const pctEl = document.getElementById('uploadPercent');
+
+  let completed = 0;
+  progress.classList.add('show');
+
+  Array.from(files).forEach((file, i) => {
+    const reader = new FileReader();
+    reader.onprogress = e => {
+      if (e.lengthComputable) {
+        const pct = Math.round((e.loaded / e.total) * 100);
+        fill.style.width = pct + '%';
+        nameEl.textContent = file.name;
+        pctEl.textContent = pct + '%';
+      }
+    };
+    reader.onload = e => {
+      const fileData = {
+        id: Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        fileType: getFileType(file),
+        data: e.target.result,
+        createdAt: Date.now(),
+      };
+      dbPut(fileData).then(() => {
+        allFiles.push(fileData);
+        completed++;
+        if (completed === files.length) {
+          progress.classList.remove('show');
+          fill.style.width = '0%';
+          renderFiles();
+          showToast(`已上传 ${files.length} 个文件`, 'success');
+        }
+      });
+    };
+    reader.onerror = () => {
+      showToast('上传失败: ' + file.name, 'error');
+      completed++;
+    };
+    reader.readAsDataURL(file);
   });
-  if (videoFiles.length === 0) {
-    playlistEl.innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px;">
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="opacity:0.4;display:block;margin:0 auto 10px">
-        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-      </svg>
-      暂无视频<br>请打开或拖入视频文件
+}
+
+// ── 渲染文件列表 ──
+function renderFiles() {
+  const query = document.getElementById('searchInput').value.toLowerCase();
+  let files = allFiles.filter(f => {
+    const matchFilter = currentFilter === 'all' || f.fileType === currentFilter;
+    const matchSearch = !query || f.name.toLowerCase().includes(query);
+    return matchFilter && matchSearch;
+  });
+
+  // 排序
+  files.sort((a, b) => {
+    switch (sortBy) {
+      case 'newest': return b.createdAt - a.createdAt;
+      case 'oldest': return a.createdAt - b.createdAt;
+      case 'name': return a.name.localeCompare(b.name, 'zh');
+      case 'size': return b.size - a.size;
+      case 'type': return a.fileType.localeCompare(b.fileType);
+      default: return 0;
+    }
+  });
+
+  const grid = document.getElementById('fileGrid');
+  document.getElementById('toolbarInfo').textContent = `共 ${files.length} 个文件`;
+
+  if (files.length === 0) {
+    grid.innerHTML = `
+      <div class="empty-state" style="grid-column:1/-1">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+        </svg>
+        <h3>暂无文件</h3>
+        <p>点击上方「上传文件」按钮或拖入文件</p>
+      </div>`;
+    return;
+  }
+
+  grid.innerHTML = files.map((f, idx) => {
+    const icon = getFileIcon(f.fileType, f.name);
+    const ext = getFileExt(f.name);
+    const thumb = f.fileType === 'image' && f.data
+      ? `<img src="${f.data}" loading="lazy" />`
+      : `<span style="font-size:52px">${icon}</span>`;
+    const listClass = viewMode === 'list' ? 'list-view' : '';
+
+    return `
+    <div class="file-card ${listClass}" data-index="${idx}" onclick="onCardClick(event, ${idx})"
+         oncontextmenu="onContextMenu(event, ${idx})">
+      <div class="file-check">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      </div>
+      <div class="file-thumb">
+        ${thumb}
+        <span class="ext-badge">${ext}</span>
+        ${f.fileType === 'video' || f.fileType === 'audio' ? '<div class="play-overlay"><span>▶</span></div>' : ''}
+      </div>
+      <div class="file-info">
+        <div class="file-name" title="${f.name}">${f.name}</div>
+        <div class="file-meta">
+          <span class="file-size">${fmtSize(f.size)}</span>
+          <span class="file-date">${fmtDate(f.createdAt)}</span>
+        </div>
+      </div>
     </div>`;
+  }).join('');
+
+  // 更新统计
+  updateStats(files);
+}
+
+// ── 统计 ──
+function updateStats(files) {
+  const total = allFiles.length;
+  const today = allFiles.filter(f => {
+    const d = new Date(f.createdAt);
+    const n = new Date();
+    return d.toDateString() === n.toDateString();
+  }).length;
+  const totalSize = allFiles.reduce((s, f) => s + f.size, 0);
+
+  document.getElementById('statTotal').textContent = total;
+  document.getElementById('statToday').textContent = today;
+  document.getElementById('statSize').textContent = fmtSize(totalSize);
+
+  // 分类计数
+  const cats = ['doc','image','video','audio','zip','other'];
+  cats.forEach(c => {
+    const el = document.getElementById('cnt' + c.charAt(0).toUpperCase() + c.slice(1));
+    if (el) el.textContent = allFiles.filter(f => f.fileType === c).length;
+  });
+  document.getElementById('cntAll').textContent = total;
+}
+
+// ── 点击卡片 ──
+function onCardClick(e, idx) {
+  // 右键单独处理
+  if (e.button === 2) return;
+  const files = getFilteredFiles();
+  if (idx >= 0 && idx < files.length) openPreview(files[idx]);
+}
+
+// ── 右键菜单 ──
+function onContextMenu(e, idx) {
+  e.preventDefault();
+  const files = getFilteredFiles();
+  ctxIndex = idx;
+  ctxFile = files[idx];
+  const menu = document.getElementById('contextMenu');
+  menu.style.left = Math.min(e.clientX, window.innerWidth - 180) + 'px';
+  menu.style.top = Math.min(e.clientY, window.innerHeight - 200) + 'px';
+  menu.classList.add('show');
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.context-menu')) {
+    document.getElementById('contextMenu').classList.remove('show');
+  }
+});
+
+function getFilteredFiles() {
+  const query = document.getElementById('searchInput').value.toLowerCase();
+  return allFiles.filter(f => {
+    const matchFilter = currentFilter === 'all' || f.fileType === currentFilter;
+    const matchSearch = !query || f.name.toLowerCase().includes(query);
+    return matchFilter && matchSearch;
+  });
+}
+
+function ctxAction(action) {
+  document.getElementById('contextMenu').classList.remove('show');
+  if (!ctxFile) return;
+  switch (action) {
+    case 'open': openPreview(ctxFile); break;
+    case 'download': downloadFile(ctxIndex); break;
+    case 'copy': copyLink(ctxFile); break;
+    case 'rename': renameFile(ctxFile); break;
+    case 'delete': deleteFile(ctxFile); break;
   }
 }
 
-// ── 播放指定索引 ──
-function playIndex(i) {
-  if (i < 0 || i >= videoFiles.length) return;
-  currentIndex = i;
-  const file = videoFiles[i];
-  const url = URL.createObjectURL(file);
-  video.src = url;
-  video.load();
-  video.play();
-  emptyState.style.display = 'none';
-  videoTitle.textContent = file.name;
-  videoSubtitle.textContent = fmtSize(file.size) + '  ·  ' + new Date(file.lastModified).toLocaleDateString('zh-CN');
-  document.getElementById('infoName').textContent = file.name.length > 14 ? file.name.substring(0,14)+'...' : file.name;
-  document.getElementById('infoSize').textContent = fmtSize(file.size);
-  renderPlaylist();
+// ── 打开预览 ──
+function openPreview(file) {
+  const overlay = document.getElementById('previewOverlay');
+  const body = document.getElementById('previewBody');
+  document.getElementById('previewTitle').textContent = file.name;
+  document.getElementById('previewInfo').innerHTML =
+    `<span>大小 <b>${fmtSize(file.size)}</b></span>` +
+    `<span>类型 <b>${file.type || '未知'}</b></span>` +
+    `<span>上传于 <b>${new Date(file.createdAt).toLocaleString('zh-CN')}</b></span>`;
+
+  body.innerHTML = '';
+  ctxFile = file;
+
+  if (file.fileType === 'image') {
+    body.innerHTML = `<img src="${file.data}" alt="${file.name}" />`;
+  } else if (file.fileType === 'video') {
+    body.innerHTML = `<video src="${file.data}" controls autoplay style="max-height:calc(100vh - 140px)"></video>`;
+  } else if (file.fileType === 'audio') {
+    body.innerHTML = `
+      <div style="width:100%;max-width:600px">
+        <audio src="${file.data}" controls autoplay style="width:100%"></audio>
+        <div style="text-align:center;margin-top:16px;color:var(--muted);font-size:14px">${file.name}</div>
+      </div>`;
+  } else {
+    body.innerHTML = `
+      <div class="preview-no-support">
+        <p style="font-size:48px;margin-bottom:20px">${getFileIcon(file.fileType)}</p>
+        <p><strong>${file.name}</strong></p>
+        <p>${fmtSize(file.size)} · ${file.type || '未知类型'}</p>
+        <p style="margin-top:20px">此文件类型不支持在线预览</p>
+        <button class="btn-primary" style="margin-top:16px" onclick="downloadFile(-1)">
+          下载文件查看
+        </button>
+      </div>`;
+  }
+
+  overlay.classList.add('show');
 }
 
-// ── 加载文件 ──
-function loadFiles(files) {
-  const videoMime = /^video\//;
-  const newFiles = Array.from(files).filter(f => videoMime.test(f.type) || /\.(mp4|webm|ogg|mov|avi|mkv|flv|m4v)$/i.test(f.name));
-  if (!newFiles.length) return;
-  videoFiles.push(...newFiles);
-  renderPlaylist();
-  if (currentIndex === -1) playIndex(0);
-  else playIndex(videoFiles.length - newFiles.length);
+function closePreview() {
+  document.getElementById('previewOverlay').classList.remove('show');
+  document.getElementById('previewBody').innerHTML = '';
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closePreview();
+});
+
+// ── 下载 ──
+function downloadFile(idx) {
+  let file;
+  if (idx === -1) file = ctxFile;
+  else {
+    const files = getFilteredFiles();
+    file = files[idx];
+  }
+  if (!file) return;
+  const a = document.createElement('a');
+  a.href = file.data;
+  a.download = file.name;
+  a.click();
+  showToast('开始下载: ' + file.name, 'success');
+}
+
+// ── 复制链接 ──
+function copyLink(file) {
+  // 本地 data URL 太长，复制文件名提示
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(file.name).then(() => {
+      showToast('已复制文件名: ' + file.name, 'success');
+    });
+  }
+}
+
+// ── 重命名 ──
+function renameFile(file) {
+  const newName = prompt('输入新文件名：', file.name);
+  if (!newName || newName === file.name) return;
+  file.name = newName;
+  file.fileType = getFileType({ name: newName, type: file.type });
+  dbPut(file).then(() => { renderFiles(); showToast('已重命名', 'success'); });
+}
+
+// ── 删除 ──
+function deleteFile(file) {
+  if (!confirm(`确认删除「${file.name}」？`)) return;
+  dbDelete(file.id).then(() => {
+    allFiles = allFiles.filter(f => f.id !== file.id);
+    renderFiles();
+    showToast('已删除: ' + file.name, 'success');
+  });
+}
+
+// ── 筛选 ──
+function setFilter(type, el) {
+  currentFilter = type;
+  document.querySelectorAll('.filter-tag').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderFiles();
+}
+
+// ── 视图 ──
+function setView(mode) {
+  viewMode = mode;
+  const grid = document.getElementById('fileGrid');
+  grid.classList.toggle('list-view', mode === 'list');
+  document.getElementById('viewGrid').classList.toggle('active', mode === 'grid');
+  document.getElementById('viewList').classList.toggle('active', mode === 'list');
+}
+
+// ── 拖放上传 ──
+const uploadZone = document.getElementById('uploadZone');
+['dragenter','dragover'].forEach(evt => {
+  uploadZone.addEventListener(evt, e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+});
+['dragleave','drop'].forEach(evt => {
+  uploadZone.addEventListener(evt, e => { e.preventDefault(); uploadZone.classList.remove('dragover'); });
+});
+uploadZone.addEventListener('drop', e => { handleFiles(e.dataTransfer.files); });
+document.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.classList.remove('dragover');
+  handleFiles(e.dataTransfer.files);
+});
+
+// ── Toast ──
+function showToast(msg, type = '') {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.className = 'toast ' + type + ' show';
+  setTimeout(() => toast.classList.remove('show'), 2500);
 }
 
 // ── 文件输入 ──
-function triggerFileOpen() { fileInput.click(); }
-fileInput.addEventListener('change', e => loadFiles(e.target.files));
+const fileInput = document.getElementById('fileInput');
+function triggerUpload() { fileInput.click(); }
 
-// ── 拖放 ──
-const videoWrap = document.getElementById('videoWrap');
-document.addEventListener('dragover', e => { e.preventDefault(); dropOverlay.classList.add('show'); });
-document.addEventListener('dragleave', e => { if (!e.relatedTarget) dropOverlay.classList.remove('show'); });
-document.addEventListener('drop', e => {
-  e.preventDefault();
-  dropOverlay.classList.remove('show');
-  loadFiles(e.dataTransfer.files);
+// ── 启动 ──
+initDB().then(() => {
+  return dbGetAll();
+}).then(files => {
+  allFiles = files;
+  renderFiles();
+}).catch(err => {
+  console.error('DB init error:', err);
+  showToast('存储初始化失败', 'error');
 });
-
-// ── 播放/暂停 ──
-btnPlay.addEventListener('click', togglePlay);
-videoWrap.addEventListener('click', e => {
-  if (e.target === videoWrap || e.target === video) togglePlay();
-});
-
-function togglePlay() {
-  if (!video.src) return;
-  if (video.paused) { video.play(); showBigPlay(false); }
-  else { video.pause(); showBigPlay(true); }
-}
-
-function showBigPlay(show) {
-  bigPlay.classList.toggle('show', show);
-  if (show) setTimeout(() => bigPlay.classList.remove('show'), 800);
-}
-
-video.addEventListener('play', () => {
-  iconPlay.style.display = 'none';
-  iconPause.style.display = '';
-});
-video.addEventListener('pause', () => {
-  iconPlay.style.display = '';
-  iconPause.style.display = 'none';
-});
-video.addEventListener('ended', () => {
-  iconPlay.style.display = '';
-  iconPause.style.display = 'none';
-  if (isLooping) { video.currentTime = 0; video.play(); }
-  else if (currentIndex + 1 < videoFiles.length) playIndex(currentIndex + 1);
-});
-
-// ── 上一个/下一个 ──
-btnPrev.addEventListener('click', () => { if (currentIndex > 0) playIndex(currentIndex - 1); });
-btnNext.addEventListener('click', () => { if (currentIndex + 1 < videoFiles.length) playIndex(currentIndex + 1); });
-
-// ── 进度条 ──
-video.addEventListener('timeupdate', () => {
-  if (!video.duration) return;
-  const pct = (video.currentTime / video.duration) * 100;
-  progressFilled.style.width = pct + '%';
-  progressThumb.style.left = pct + '%';
-  timeDisplay.textContent = fmtTime(video.currentTime) + ' / ' + fmtTime(video.duration);
-});
-video.addEventListener('progress', () => {
-  if (!video.duration) return;
-  if (video.buffered.length > 0) {
-    const buffered = (video.buffered.end(video.buffered.length - 1) / video.duration) * 100;
-    progressBuffer.style.width = buffered + '%';
-  }
-});
-video.addEventListener('loadedmetadata', () => {
-  timeDisplay.textContent = '0:00 / ' + fmtTime(video.duration);
-  document.getElementById('infoDuration').textContent = fmtTime(video.duration);
-  document.getElementById('infoRes').textContent = video.videoWidth + '×' + video.videoHeight;
-  qualityBadge.textContent = video.videoHeight ? video.videoHeight + 'p' : '-';
-  const f = videoFiles[currentIndex];
-  if (f) f.duration = video.duration;
-  renderPlaylist();
-});
-
-progressArea.addEventListener('mousemove', e => {
-  const rect = progressArea.getBoundingClientRect();
-  const pct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-  timeTooltip.textContent = fmtTime(pct * (video.duration || 0));
-  timeTooltip.style.left = (pct * 100) + '%';
-});
-progressArea.addEventListener('click', e => {
-  if (!video.duration) return;
-  const rect = progressArea.getBoundingClientRect();
-  const pct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-  video.currentTime = pct * video.duration;
-});
-
-// 拖动进度
-let seekDragging = false;
-progressArea.addEventListener('mousedown', e => { seekDragging = true; seekTo(e); });
-document.addEventListener('mousemove', e => { if (seekDragging) seekTo(e); });
-document.addEventListener('mouseup', () => { seekDragging = false; });
-function seekTo(e) {
-  if (!video.duration) return;
-  const rect = progressArea.getBoundingClientRect();
-  const pct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-  video.currentTime = pct * video.duration;
-}
-
-// ── 音量 ──
-volumeSlider.addEventListener('input', () => {
-  video.volume = parseFloat(volumeSlider.value);
-  video.muted = video.volume === 0;
-  updateVolIcon();
-  document.getElementById('infoVol').textContent = Math.round(video.volume * 100) + '%';
-});
-btnMute.addEventListener('click', () => {
-  video.muted = !video.muted;
-  updateVolIcon();
-});
-function updateVolIcon() {
-  const muted = video.muted || video.volume === 0;
-  iconVol.style.display = muted ? 'none' : '';
-  iconMuted.style.display = muted ? '' : 'none';
-}
-
-// ── 播放速度 ──
-speedSelect.addEventListener('change', () => {
-  video.playbackRate = parseFloat(speedSelect.value);
-  document.getElementById('infoSpeed').textContent = speedSelect.value + 'x';
-});
-
-// ── 循环 ──
-btnLoop.addEventListener('click', () => {
-  isLooping = !isLooping;
-  btnLoop.classList.toggle('active', isLooping);
-  document.getElementById('infoLoop').textContent = isLooping ? '开启' : '关闭';
-});
-
-// ── 画中画 ──
-btnPip.addEventListener('click', async () => {
-  if (!video.src) return;
-  try {
-    if (document.pictureInPictureElement) await document.exitPictureInPicture();
-    else await video.requestPictureInPicture();
-  } catch(e) { console.log('PiP not supported'); }
-});
-
-// ── 全屏 ──
-function toggleFullscreen() {
-  if (document.fullscreenElement) document.exitFullscreen();
-  else videoWrap.requestFullscreen();
-}
-document.getElementById('btnFullscreen').addEventListener('click', toggleFullscreen);
-document.getElementById('btnFullscreen2').addEventListener('click', toggleFullscreen);
-
-// ── 截图 ──
-document.getElementById('btnSnapshot').addEventListener('click', takeSnapshot);
-function takeSnapshot() {
-  if (!video.src || !video.videoWidth) return;
-  const canvas = document.createElement('canvas');
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(video, 0, 0);
-  canvas.toBlob(blob => {
-    const item = new ClipboardItem({ 'image/png': blob });
-    navigator.clipboard.write([item]).then(() => {
-      showToast('📸 截图已复制到剪贴板');
-    }).catch(() => {
-      // 降级：下载
-      const a = document.createElement('a');
-      a.href = canvas.toDataURL('image/png');
-      a.download = 'snapshot_' + fmtTime(video.currentTime).replace(/:/g,'-') + '.png';
-      a.click();
-      showToast('📸 截图已下载');
-    });
-  });
-}
-function showToast(msg) {
-  snapshotToast.textContent = msg;
-  snapshotToast.classList.add('show');
-  setTimeout(() => snapshotToast.classList.remove('show'), 2000);
-}
-
-// ── 侧边栏 Tab ──
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
-  });
-});
-
-// ── 搜索 ──
-searchInput.addEventListener('input', renderPlaylist);
-
-// ── 键盘快捷键 ──
-document.addEventListener('keydown', e => {
-  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
-  switch(e.key) {
-    case ' ': e.preventDefault(); togglePlay(); break;
-    case 'ArrowRight': video.currentTime = Math.min(video.duration, video.currentTime + 5); break;
-    case 'ArrowLeft': video.currentTime = Math.max(0, video.currentTime - 5); break;
-    case 'ArrowUp': e.preventDefault(); volumeSlider.value = Math.min(1, parseFloat(volumeSlider.value) + 0.1); volumeSlider.dispatchEvent(new Event('input')); break;
-    case 'ArrowDown': e.preventDefault(); volumeSlider.value = Math.max(0, parseFloat(volumeSlider.value) - 0.1); volumeSlider.dispatchEvent(new Event('input')); break;
-    case 'f': case 'F': toggleFullscreen(); break;
-    case 'm': case 'M': btnMute.click(); break;
-    case 'l': case 'L': btnLoop.click(); break;
-    case 'n': case 'N': btnNext.click(); break;
-    case 'p': case 'P': btnPrev.click(); break;
-  }
-});
-
-// ── 初始化 ──
-renderPlaylist();
-
-// ── URL嵌入模式 ──
-let lastLoadedUrl = '';
-let isUrlMode = false;
-
-function showUrlInput() {
-  document.getElementById('urlInputContainer').classList.add('show');
-  document.getElementById('urlInput').focus();
-}
-
-function exitUrlMode() {
-  document.getElementById('urlInputContainer').classList.remove('show');
-  document.getElementById('urlInput').value = '';
-  document.getElementById('iframeContainer').classList.remove('show');
-  document.getElementById('iframeError').classList.remove('show');
-  document.getElementById('urlIframe').src = 'about:blank';
-  document.getElementById('videoWrap').querySelector('video').style.display = '';
-  isUrlMode = false;
-}
-
-function loadUrl() {
-  const input = document.getElementById('urlInput');
-  let url = input.value.trim();
-  if (!url) return;
-
-  // 自动补全协议
-  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
-  lastLoadedUrl = url;
-
-  const videoWrap = document.getElementById('videoWrap');
-  const iframeContainer = document.getElementById('iframeContainer');
-  const iframe = document.getElementById('urlIframe');
-  const iframeError = document.getElementById('iframeError');
-  const mainVideo = document.getElementById('mainVideo');
-  const hint = document.getElementById('iframeHint');
-
-  // 切换视图
-  mainVideo.style.display = 'none';
-  iframeContainer.classList.add('show');
-  iframeError.classList.remove('show');
-  isUrlMode = true;
-
-  // 优先尝试直接嵌入
-  iframe.onload = function() {
-    iframeError.classList.remove('show');
-  };
-  iframe.onerror = function() {
-    iframeError.classList.add('show');
-  };
-
-  iframe.src = url;
-
-  // 超时检测 + 跨域判断
-  setTimeout(() => {
-    try {
-      if (iframeContainer.classList.contains('show')) {
-        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-        if (!iframeDoc || iframeDoc.body.innerHTML === '' || iframeDoc.title === '') {
-          iframeError.classList.add('show');
-          hint.textContent = '该网站无法被嵌入（X-Frame-Options 限制），请用代理模式';
-          // 自动切换到代理模式
-          loadUrlViaProxy(url);
-        }
-      }
-    } catch (e) {
-      // 跨域异常 = 大概率是禁止嵌入
-      iframeError.classList.add('show');
-      const blocked = ['iqiyi','youku','v.qq','tencent','bilibili','youtube','douyin'];
-      if (blocked.some(s => url.includes(s))) {
-        hint.innerHTML = '该平台禁止直接嵌入<br>可用代理模式：' +
-          '<a href="https://'+url.replace('https://','').split('/')[0]+'" target="_blank" style="color:#6c63ff">点击直接在新窗口打开</a>';
-      } else {
-        hint.textContent = '该网站禁止被嵌入iframe，请在新标签页打开';
-      }
-    }
-  }, 3000);
-}
-
-// ── 代理模式 ──
-function loadUrlViaProxy(rawUrl) {
-  if (!rawUrl) return;
-  const iframe = document.getElementById('urlIframe');
-  const iframeError = document.getElementById('iframeError');
-  const hint = document.getElementById('iframeHint');
-  // 使用 corsproxy.io 免费代理
-  const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(rawUrl);
-  iframeError.classList.remove('show');
-  iframe.src = proxyUrl;
-}
-
-// 回车触发播放
-document.getElementById('urlInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter') loadUrl();
-});
-
-// 切换到本地模式时退出URL模式
-document.querySelector('.open-file-btn') && document.querySelector('.open-file-btn').addEventListener('click', () => {
-  if (isUrlMode) exitUrlMode();
-}, true);
 </script>
 </body>
 </html>
