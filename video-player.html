@@ -709,7 +709,10 @@
           </svg>
           <p>无法加载此页面<br>该网站可能禁止了嵌入，或需要登录/付费</p>
           <p class="hint" id="iframeHint">提示：爱奇艺、优酷、腾讯视频等平台禁止嵌入，请直接访问原站</p>
-          <button class="url-btn" style="margin-top:8px" onclick="window.open(lastLoadedUrl, '_blank')">↗ 在新标签页打开</button>
+          <div style="display:flex;gap:10px;margin-top:8px">
+            <button class="url-btn" onclick="loadUrlViaProxy(lastLoadedUrl)">🔄 代理模式尝试</button>
+            <button class="url-btn cancel-btn" onclick="window.open(lastLoadedUrl, '_blank')">↗ 在新标签页打开</button>
+          </div>
         </div>
       </div>
     </div>
@@ -1203,6 +1206,7 @@ function loadUrl() {
   const iframe = document.getElementById('urlIframe');
   const iframeError = document.getElementById('iframeError');
   const mainVideo = document.getElementById('mainVideo');
+  const hint = document.getElementById('iframeHint');
 
   // 切换视图
   mainVideo.style.display = 'none';
@@ -1210,6 +1214,7 @@ function loadUrl() {
   iframeError.classList.remove('show');
   isUrlMode = true;
 
+  // 优先尝试直接嵌入
   iframe.onload = function() {
     iframeError.classList.remove('show');
   };
@@ -1217,30 +1222,44 @@ function loadUrl() {
     iframeError.classList.add('show');
   };
 
-  // 超时检测（某些网站会静默阻止）
+  iframe.src = url;
+
+  // 超时检测 + 跨域判断
   setTimeout(() => {
     try {
-      // 检测iframe是否真的有内容
       if (iframeContainer.classList.contains('show')) {
         const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
         if (!iframeDoc || iframeDoc.body.innerHTML === '' || iframeDoc.title === '') {
           iframeError.classList.add('show');
+          hint.textContent = '该网站无法被嵌入（X-Frame-Options 限制），请用代理模式';
+          // 自动切换到代理模式
+          loadUrlViaProxy(url);
         }
       }
     } catch (e) {
-      // 跨域访问会抛异常，这是正常的（大部分网站会阻止）
-      // 只有在没有加载任何内容时才显示错误
-      const hint = document.getElementById('iframeHint');
-      if (url.includes('iqiyi') || url.includes('youku') || url.includes('v.qq') || url.includes('tencent')) {
-        hint.textContent = '该平台禁止嵌入，请点击下方"在新标签页打开"';
-      } else {
-        hint.textContent = '该网站禁止被嵌入iframe，请点击下方"在新标签页打开"';
-      }
+      // 跨域异常 = 大概率是禁止嵌入
       iframeError.classList.add('show');
+      const blocked = ['iqiyi','youku','v.qq','tencent','bilibili','youtube','douyin'];
+      if (blocked.some(s => url.includes(s))) {
+        hint.innerHTML = '该平台禁止直接嵌入<br>可用代理模式：' +
+          '<a href="https://'+url.replace('https://','').split('/')[0]+'" target="_blank" style="color:#6c63ff">点击直接在新窗口打开</a>';
+      } else {
+        hint.textContent = '该网站禁止被嵌入iframe，请在新标签页打开';
+      }
     }
   }, 3000);
+}
 
-  iframe.src = url;
+// ── 代理模式 ──
+function loadUrlViaProxy(rawUrl) {
+  if (!rawUrl) return;
+  const iframe = document.getElementById('urlIframe');
+  const iframeError = document.getElementById('iframeError');
+  const hint = document.getElementById('iframeHint');
+  // 使用 corsproxy.io 免费代理
+  const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(rawUrl);
+  iframeError.classList.remove('show');
+  iframe.src = proxyUrl;
 }
 
 // 回车触发播放
