@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0"/>
+<title>🎬 在线影院</title>
+<style>
+:root{
+  --bg:#0a0a0f;
+  --panel:#12121a;
+  --card:#1a1a26;
+  --card2:#22223a;
+  --accent:#e50914;
+  --accent2:#ff6b35;
+  --blue:#4f8ef7;
+  --text:#f0f0f8;
+  --muted:#7878a0;
+  --border:#2a2a40;
+  --radius:12px;
+  --gold:#f5c518;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;font-family:'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--text);}
+a{text-decoration:none;color:inherit;}
+
+/* ── 滚动条 ── */
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+
+/* ── 顶栏 ── */
+header{
+  position:sticky;top:0;z-index:100;
+  display:flex;align-items:center;gap:16px;
+  padding:0 24px;height:58px;
+  background:rgba(10,10,15,0.92);
+  backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);
+}
+.logo{font-size:20px;font-weight:800;letter-spacing:1px;white-space:nowrap;
+  background:linear-gradient(90deg,var(--accent),var(--accent2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.nav{display:flex;gap:6px;margin-left:8px;}
+.nav-btn{padding:6px 14px;border-radius:20px;font-size:13px;color:var(--muted);cursor:pointer;border:none;background:none;transition:all .15s;}
+.nav-btn:hover,.nav-btn.active{background:var(--card2);color:var(--text);}
+.spacer{flex:1;}
+.header-search{
+  display:flex;align-items:center;gap:8px;
+  background:var(--card);border:1px solid var(--border);
+  border-radius:24px;padding:7px 16px;width:220px;
+  transition:border-color .2s,width .2s;
+}
+.header-search:focus-within{border-color:var(--accent);width:280px;}
+.header-search input{background:none;border:none;outline:none;color:var(--text);font-size:13px;width:100%;}
+.header-search input::placeholder{color:var(--muted);}
+
+/* ── 主区域 ── */
+main{max-width:1200px;margin:0 auto;padding:24px 16px 60px;}
+
+/* ── 输入播放区 ── */
+.play-input-card{
+  background:linear-gradient(135deg,#1a0a14,#0a0a20);
+  border:1px solid var(--border);
+  border-radius:16px;padding:28px 24px;margin-bottom:32px;
+  position:relative;overflow:hidden;
+}
+.play-input-card::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse at 20% 50%,rgba(229,9,20,.08),transparent 60%),
+             radial-gradient(ellipse at 80% 50%,rgba(79,142,247,.06),transparent 60%);
+  pointer-events:none;
+}
+.play-input-card h2{font-size:18px;font-weight:700;margin-bottom:6px;}
+.play-input-card p{font-size:13px;color:var(--muted);margin-bottom:18px;}
+.url-row{display:flex;gap:10px;flex-wrap:wrap;}
+.url-input{
+  flex:1;min-width:200px;
+  background:rgba(255,255,255,.05);
+  border:1px solid var(--border);
+  border-radius:10px;padding:12px 16px;
+  color:var(--text);font-size:14px;outline:none;
+  transition:border-color .2s;
+}
+.url-input:focus{border-color:var(--accent);}
+.url-input::placeholder{color:var(--muted);}
+.btn-play-url{
+  background:var(--accent);color:#fff;border:none;
+  border-radius:10px;padding:12px 24px;font-size:14px;
+  font-weight:700;cursor:pointer;white-space:nowrap;
+  transition:background .15s,transform .1s;
+}
+.btn-play-url:hover{background:#ff1a27;}
+.btn-play-url:active{transform:scale(.97);}
+.format-tips{margin-top:10px;font-size:12px;color:var(--muted);}
+.format-tips span{
+  display:inline-block;background:var(--card2);
+  border-radius:4px;padding:2px 8px;margin:2px 3px;font-size:11px;
+}
+
+/* ── 播放器弹窗 ── */
+.player-modal{
+  display:none;position:fixed;inset:0;z-index:200;
+  background:rgba(0,0,0,.95);
+  flex-direction:column;
+}
+.player-modal.open{display:flex;}
+.player-topbar{
+  display:flex;align-items:center;gap:12px;
+  padding:12px 20px;background:rgba(0,0,0,.6);flex-shrink:0;
+}
+.player-title{font-size:15px;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.btn-close-player{
+  background:rgba(255,255,255,.1);border:none;color:var(--text);
+  border-radius:8px;padding:8px 16px;cursor:pointer;font-size:13px;
+  transition:background .15s;
+}
+.btn-close-player:hover{background:rgba(255,255,255,.2);}
+.player-body{flex:1;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;}
+#movieVideo{width:100%;height:100%;object-fit:contain;}
+#iframePlayer{width:100%;height:100%;border:none;}
+
+/* 播放器控制栏 */
+.player-ctrl{
+  background:linear-gradient(transparent,rgba(0,0,0,.9));
+  padding:16px 20px 12px;flex-shrink:0;
+}
+.prog-area{padding:8px 0 4px;cursor:pointer;position:relative;}
+.prog-track{height:4px;background:rgba(255,255,255,.2);border-radius:2px;position:relative;overflow:hidden;transition:height .15s;}
+.prog-area:hover .prog-track{height:6px;}
+.prog-filled{height:100%;background:var(--accent);border-radius:2px;width:0%;pointer-events:none;}
+.prog-buffer{position:absolute;top:0;left:0;height:100%;background:rgba(255,255,255,.15);border-radius:2px;width:0%;pointer-events:none;}
+.prog-thumb{position:absolute;top:50%;transform:translate(-50%,-50%);width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 0 6px rgba(0,0,0,.6);opacity:0;transition:opacity .15s;pointer-events:none;}
+.prog-area:hover .prog-thumb{opacity:1;}
+.ctrl-row{display:flex;align-items:center;gap:6px;margin-top:6px;}
+.cbtn{background:none;border:none;color:rgba(255,255,255,.8);cursor:pointer;padding:7px;border-radius:8px;display:flex;align-items:center;justify-content:center;transition:color .15s,background .15s;font-size:12px;}
+.cbtn:hover{color:#fff;background:rgba(255,255,255,.1);}
+.cbtn.on{color:var(--accent);}
+.pbtn{width:42px;height:42px;border-radius:50%;background:var(--accent);color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,transform .1s;margin:0 4px;}
+.pbtn:hover{background:#ff1a27;}
+.pbtn:active{transform:scale(.95);}
+.time-txt{font-size:12px;color:rgba(255,255,255,.6);white-space:nowrap;font-variant-numeric:tabular-nums;margin:0 6px;}
+.sp-sel{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);color:#fff;border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer;outline:none;}
+.vol-wrap{display:flex;align-items:center;gap:6px;}
+.vol-range{-webkit-appearance:none;appearance:none;width:70px;height:4px;border-radius:2px;background:rgba(255,255,255,.2);outline:none;cursor:pointer;}
+.vol-range::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:13px;height:13px;border-radius:50%;background:var(--accent);cursor:pointer;}
+
+/* ── 卡片网格 ── */
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.section-title{font-size:17px;font-weight:700;}
+.section-title span{color:var(--accent);}
+.see-all{font-size:13px;color:var(--blue);cursor:pointer;}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:36px;}
+.movie-card{
+  background:var(--card);border-radius:var(--radius);
+  overflow:hidden;cursor:pointer;
+  transition:transform .2s,box-shadow .2s;
+  border:1px solid var(--border);
+}
+.movie-card:hover{transform:translateY(-4px);box-shadow:0 12px 32px rgba(0,0,0,.5);}
+.card-thumb{
+  position:relative;width:100%;padding-top:150%;
+  background:var(--card2);overflow:hidden;
+}
+.card-thumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+.card-thumb .no-img{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:8px;color:var(--muted);font-size:11px;
+}
+.card-badge{
+  position:absolute;top:8px;left:8px;
+  background:var(--accent);color:#fff;
+  font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;
+}
+.card-score{
+  position:absolute;top:8px;right:8px;
+  background:rgba(0,0,0,.75);color:var(--gold);
+  font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;
+}
+.card-play-overlay{
+  position:absolute;inset:0;background:rgba(0,0,0,.5);
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;transition:opacity .2s;
+}
+.movie-card:hover .card-play-overlay{opacity:1;}
+.play-circle{
+  width:48px;height:48px;border-radius:50%;
+  background:rgba(229,9,20,.85);
+  display:flex;align-items:center;justify-content:center;
+}
+.card-info{padding:10px 12px;}
+.card-title{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.card-meta{font-size:11px;color:var(--muted);margin-top:3px;}
+
+/* ── 轮播横幅 ── */
+.banner{
+  border-radius:16px;overflow:hidden;position:relative;
+  height:220px;margin-bottom:32px;background:var(--card2);
+  background:linear-gradient(135deg,#1a0a22,#0a1422,#0a1a0a);
+  display:flex;align-items:flex-end;padding:24px;
+}
+.banner-bg{position:absolute;inset:0;background:url('') center/cover;filter:brightness(.4);}
+.banner-text{position:relative;z-index:1;}
+.banner-tag{
+  display:inline-block;background:var(--accent);color:#fff;
+  font-size:11px;font-weight:700;padding:3px 10px;border-radius:4px;margin-bottom:8px;
+}
+.banner-title{font-size:22px;font-weight:800;margin-bottom:6px;}
+.banner-desc{font-size:13px;color:rgba(255,255,255,.7);margin-bottom:14px;max-width:400px;}
+.banner-btns{display:flex;gap:10px;}
+.btn-watch{
+  background:var(--accent);color:#fff;border:none;
+  border-radius:8px;padding:10px 22px;font-size:14px;
+  font-weight:700;cursor:pointer;transition:background .15s;
+}
+.btn-watch:hover{background:#ff1a27;}
+.btn-info{
+  background:rgba(255,255,255,.15);color:#fff;border:none;
+  border-radius:8px;padding:10px 22px;font-size:14px;
+  cursor:pointer;transition:background .15s;
+  backdrop-filter:blur(4px);
+}
+.btn-info:hover{background:rgba(255,255,255,.25);}
+
+/* ── 分类标签 ── */
+.tags{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:28px;}
+.tag{
+  padding:7px 16px;border-radius:20px;font-size:13px;
+  background:var(--card);border:1px solid var(--border);
+  cursor:pointer;transition:all .15s;color:var(--muted);
+}
+.tag:hover,.tag.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+
+/* ── 收藏夹 ── */
+.fav-empty{text-align:center;padding:40px;color:var(--muted);font-size:14px;}
+.fav-empty svg{display:block;margin:0 auto 12px;opacity:.3;}
+
+/* ── 历史记录 ── */
+.history-item{
+  display:flex;align-items:center;gap:14px;
+  padding:12px 16px;border-radius:10px;
+  background:var(--card);border:1px solid var(--border);
+  margin-bottom:8px;cursor:pointer;
+  transition:background .15s;
+}
+.history-item:hover{background:var(--card2);}
+.history-url{font-size:13px;color:var(--blue);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.history-time{font-size:11px;color:var(--muted);white-space:nowrap;}
+.btn-del{background:none;border:none;color:var(--muted);cursor:pointer;padding:4px;border-radius:4px;}
+.btn-del:hover{color:var(--accent);}
+
+/* ── Toast ── */
+.toast{
+  position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:rgba(30,30,50,.95);border:1px solid var(--border);
+  color:var(--text);padding:10px 22px;border-radius:10px;
+  font-size:13px;opacity:0;transition:all .3s;pointer-events:none;z-index:999;
+  white-space:nowrap;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* ── 移动端适配 ── */
+@media(max-width:700px){
+  header{padding:0 14px;}
+  .header-search{width:160px;}
+  .header-search:focus-within{width:180px;}
+  .nav{display:none;}
+  main{padding:16px 12px 60px;}
+  .banner{height:160px;padding:16px;}
+  .banner-title{font-size:17px;}
+  .banner-desc{display:none;}
+  .grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;}
+  .play-input-card{padding:18px 14px;}
+  .url-row{flex-direction:column;}
+  .btn-play-url{width:100%;}
+  .player-ctrl{padding:12px 12px 8px;}
+  .vol-range{width:50px;}
+  .sp-sel{display:none;}
+}
+@media(max-width:400px){
+  .grid{grid-template-columns:repeat(2,1fr);}
+}
+</style>
+</head>
+<body>
+
+<!-- 顶栏 -->
+<header>
+  <div class="logo">🎬 CinePlay</div>
+  <nav class="nav">
+    <button class="nav-btn active" onclick="switchPage('home',this)">首页</button>
+    <button class="nav-btn" onclick="switchPage('fav',this)">收藏</button>
+    <button class="nav-btn" onclick="switchPage('history',this)">历史</button>
+  </nav>
+  <div class="spacer"></div>
+  <div class="header-search">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="text" placeholder="搜索电影..." id="globalSearch"/>
+  </div>
+</header>
+
+<!-- 播放器弹窗 -->
+<div class="player-modal" id="playerModal">
+  <div class="player-topbar">
+    <button class="btn-close-player" onclick="closePlayer()">✕ 关闭</button>
+    <div class="player-title" id="playerTitle">正在播放</div>
+    <button class="cbtn" title="画中画" id="btnPip2" style="margin-left:auto">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><rect x="12" y="10" width="8" height="5" rx="1"/></svg>
+    </button>
+    <button class="cbtn" title="全屏" id="btnFs2">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+    </button>
+  </div>
+  <div class="player-body" id="playerBody">
+    <video id="movieVideo" preload="metadata" playsinline></video>
+    <iframe id="iframePlayer" allowfullscreen allow="autoplay; fullscreen" style="display:none"></iframe>
+  </div>
+  <div class="player-ctrl" id="playerCtrl">
+    <!-- 进度条 -->
+    <div class="prog-area" id="progArea">
+      <div class="prog-track">
+        <div class="prog-buffer" id="progBuffer"></div>
+        <div class="prog-filled" id="progFilled"></div>
+      </div>
+      <div class="prog-thumb" id="progThumb"></div>
+    </div>
+    <!-- 按钮行 -->
+    <div class="ctrl-row">
+      <button class="pbtn" id="btnPlayPause">
+        <svg id="ic-play" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        <svg id="ic-pause" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+      </button>
+      <span class="time-txt" id="timeTxt">0:00 / 0:00</span>
+      <div style="flex:1"></div>
+      <select class="sp-sel" id="spSel">
+        <option value=".5">0.5x</option><option value=".75">0.75x</option>
+        <option value="1" selected>1.0x</option><option value="1.25">1.25x</option>
+        <option value="1.5">1.5x</option><option value="2">2.0x</option>
+      </select>
+      <div class="vol-wrap">
+        <button class="cbtn" id="btnMute2">
+          <svg id="ic-vol" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+          <svg id="ic-muted" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+        </button>
+        <input type="range" class="vol-range" id="volRange" min="0" max="1" step=".02" value="1"/>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 主内容 -->
+<main id="mainContent">
+
+  <!-- 首页 -->
+  <div id="pageHome">
+    <!-- 横幅 -->
+    <div class="banner">
+      <div class="banner-bg" id="bannerBg"></div>
+      <div class="banner-text">
+        <div class="banner-tag">🔥 热门推荐</div>
+        <div class="banner-title">粘贴视频链接，即刻开播</div>
+        <div class="banner-desc">支持 MP4、M3U8、直播流等格式，也可嵌入 B站、YouTube 等平台链接</div>
+        <div class="banner-btns">
+          <button class="btn-watch" onclick="document.getElementById('urlInput').focus();document.getElementById('urlInput').scrollIntoView({behavior:'smooth'})">立即播放</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 输入播放 -->
+    <div class="play-input-card">
+      <h2>🔗 在线播放视频</h2>
+      <p>粘贴视频地址，支持直链视频、M3U8直播流、网络视频等</p>
+      <div class="url-row">
+        <input class="url-input" id="urlInput" type="url" placeholder="粘贴视频链接，如 https://example.com/video.mp4"/>
+        <button class="btn-play-url" onclick="playFromUrl()">▶ 立即播放</button>
+      </div>
+      <div class="format-tips">
+        支持格式：<span>MP4</span><span>WebM</span><span>M3U8</span><span>OGG</span><span>MOV</span>
+        也支持嵌入：<span>B站</span><span>YouTube</span><span>优酷</span><span>爱奇艺</span>
+      </div>
+    </div>
+
+    <!-- 分类 -->
+    <div class="tags" id="categoryTags">
+      <div class="tag active" onclick="filterCat('全部',this)">全部</div>
+      <div class="tag" onclick="filterCat('电影',this)">电影</div>
+      <div class="tag" onclick="filterCat('电视剧',this)">电视剧</div>
+      <div class="tag" onclick="filterCat('综艺',this)">综艺</div>
+      <div class="tag" onclick="filterCat('动漫',this)">动漫</div>
+      <div class="tag" onclick="filterCat('纪录片',this)">纪录片</div>
+      <div class="tag" onclick="filterCat('体育',this)">体育</div>
+    </div>
+
+    <!-- 示例卡片区 -->
+    <div class="section-header">
+      <div class="section-title">示例视频 <span>· 点击播放</span></div>
+    </div>
+    <div class="grid" id="sampleGrid"></div>
+
+    <!-- 使用说明 -->
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-top:8px;">
+      <div style="font-size:15px;font-weight:700;margin-bottom:14px;">📖 使用说明</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">
+        <div style="font-size:13px;color:var(--muted);line-height:1.8;">
+          <strong style="color:var(--text);">① 视频直链</strong><br>
+          粘贴 .mp4/.m3u8 等格式的直接下载链接即可播放
+        </div>
+        <div style="font-size:13px;color:var(--muted);line-height:1.8;">
+          <strong style="color:var(--text);">② 嵌入网页</strong><br>
+          粘贴 B站/YouTube/优酷 等视频页面链接，自动嵌入播放
+        </div>
+        <div style="font-size:13px;color:var(--muted);line-height:1.8;">
+          <strong style="color:var(--text);">③ 收藏链接</strong><br>
+          播放时点击「收藏」，下次直接从收藏夹打开
+        </div>
+        <div style="font-size:13px;color:var(--muted);line-height:1.8;">
+          <strong style="color:var(--text);">④ 手机分享</strong><br>
+          把本页面链接分享给朋友，手机浏览器直接打开使用
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 收藏页 -->
+  <div id="pageFav" style="display:none">
+    <div class="section-header">
+      <div class="section-title">❤️ 我的收藏</div>
+      <span class="see-all" onclick="clearFav()">清空</span>
+    </div>
+    <div id="favList"></div>
+  </div>
+
+  <!-- 历史页 -->
+  <div id="pageHistory" style="display:none">
+    <div class="section-header">
+      <div class="section-title">🕐 播放历史</div>
+      <span class="see-all" onclick="clearHistory()">清空</span>
+    </div>
+    <div id="historyList"></div>
+  </div>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════
+// 示例视频数据（公开MP4资源）
+// ══════════════════════════════════
+const SAMPLES = [
+  {title:'Big Buck Bunny',meta:'动画短片 · 2008',cat:'动漫',score:'9.0',
+   url:'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+   thumb:'https://peach.blender.org/wp-content/uploads/bbb-splash.png'},
+  {title:'Elephant Dream',meta:'动画短片 · 2006',cat:'动漫',score:'8.5',
+   url:'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+   thumb:''},
+  {title:'For Bigger Blazes',meta:'广告片 · HLS',cat:'电影',score:'8.0',
+   url:'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+   thumb:''},
+  {title:'For Bigger Escapes',meta:'广告片',cat:'电影',score:'7.8',
+   url:'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+   thumb:''},
+  {title:'Subaru Outback',meta:'汽车广告',cat:'综艺',score:'8.2',
+   url:'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4',
+   thumb:''},
+  {title:'Tears of Steel',meta:'科幻短片 · 2012',cat:'电影',score:'9.2',
+   url:'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
+   thumb:''},
+  {title:'Volkswagen GTI',meta:'汽车广告',cat:'综艺',score:'7.5',
+   url:'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/VolkswagenGTIReview.mp4',
+   thumb:''},
+  {title:'We Are Going On Bullrun',meta:'纪录片',cat:'纪录片',score:'8.8',
+   url:'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WeAreGoingOnBullrun.mp4',
+   thumb:''},
+];
+
+let currentCat = '全部';
+let favList = JSON.parse(localStorage.getItem('cineplay_fav')||'[]');
+let histList = JSON.parse(localStorage.getItem('cineplay_hist')||'[]');
+
+// ── 渲染示例卡片 ──
+function renderSamples(data){
+  const grid = document.getElementById('sampleGrid');
+  grid.innerHTML = '';
+  data.forEach(m=>{
+    const card = document.createElement('div');
+    card.className = 'movie-card';
+    const isFav = favList.some(f=>f.url===m.url);
+    card.innerHTML = `
+      <div class="card-thumb">
+        ${m.thumb?`<img src="${m.thumb}" loading="lazy" onerror="this.style.display='none'">`:''}
+        <div class="no-img" ${m.thumb?'style="display:none"':''}>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.4">
+            <path d="M15.6 11.6L22 7v10l-6.4-4.5v-1zM4 5h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/>
+          </svg>
+          <span>${m.title}</span>
+        </div>
+        <div class="card-badge">${m.cat}</div>
+        <div class="card-score">⭐${m.score}</div>
+        <div class="card-play-overlay">
+          <div class="play-circle">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </div>
+        </div>
+      </div>
+      <div class="card-info">
+        <div class="card-title">${m.title}</div>
+        <div class="card-meta">${m.meta}</div>
+      </div>`;
+    card.onclick = ()=>playVideo(m.url, m.title);
+    grid.appendChild(card);
+  });
+}
+
+function filterCat(cat, el){
+  currentCat = cat;
+  document.querySelectorAll('#categoryTags .tag').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  const filtered = cat==='全部' ? SAMPLES : SAMPLES.filter(m=>m.cat===cat);
+  renderSamples(filtered);
+}
+
+// ── 播放逻辑 ──
+const playerModal = document.getElementById('playerModal');
+const movieVideo = document.getElementById('movieVideo');
+const iframePlayer = document.getElementById('iframePlayer');
+const playerTitle = document.getElementById('playerTitle');
+const playerCtrl = document.getElementById('playerCtrl');
+
+function isVideoUrl(url){
+  return /\.(mp4|webm|ogg|ogv|mov|m4v|avi|mkv|flv|ts)(\?|$)/i.test(url);
+}
+function isM3U8(url){ return /\.m3u8(\?|$)/i.test(url); }
+function getEmbedUrl(url){
+  // Bilibili
+  let m = url.match(/bilibili\.com\/video\/(BV\w+|av\d+)/i);
+  if(m) return `https://player.bilibili.com/player.html?bvid=${m[1]}&autoplay=1`;
+  // YouTube
+  m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
+  if(m) return `https://www.youtube.com/embed/${m[1]}?autoplay=1`;
+  // 优酷
+  m = url.match(/youku\.com\/v_show\/id_(\w+)/);
+  if(m) return `https://player.youku.com/embed/${m[1]}`;
+  // 爱奇艺
+  m = url.match(/iqiyi\.com\/v_(\w+)/);
+  if(m) return `https://player.iqiyi.com/flash/age/play.action?vid=${m[1]}`;
+  return null;
+}
+
+function playVideo(url, title=''){
+  if(!url) return showToast('请输入视频链接');
+  url = url.trim();
+  playerTitle.textContent = title || url;
+  playerModal.classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  // 保存历史
+  histList = histList.filter(h=>h.url!==url);
+  histList.unshift({url, title:title||url, time:new Date().toLocaleString('zh-CN')});
+  if(histList.length>50) histList.pop();
+  localStorage.setItem('cineplay_hist', JSON.stringify(histList));
+
+  // 判断类型
+  const embedUrl = getEmbedUrl(url);
+  if(embedUrl){
+    // iframe嵌入
+    movieVideo.style.display='none';
+    iframePlayer.style.display='block';
+    iframePlayer.src = embedUrl;
+    playerCtrl.style.display='none';
+  } else {
+    // 直链视频
+    iframePlayer.style.display='none';
+    iframePlayer.src='';
+    movieVideo.style.display='block';
+    playerCtrl.style.display='';
+    movieVideo.src = url;
+    movieVideo.load();
+    movieVideo.play().catch(()=>{});
+  }
+}
+
+function playFromUrl(){
+  const url = document.getElementById('urlInput').value.trim();
+  if(!url){ showToast('请先粘贴视频链接 🔗'); return; }
+  playVideo(url);
+}
+
+function closePlayer(){
+  playerModal.classList.remove('open');
+  document.body.style.overflow='';
+  movieVideo.pause();
+  movieVideo.src='';
+  iframePlayer.src='';
+}
+
+// Enter 键播放
+document.getElementById('urlInput').addEventListener('keydown',e=>{
+  if(e.key==='Enter') playFromUrl();
+});
+
+// ── 播放器控制 ──
+const btnPP = document.getElementById('btnPlayPause');
+const icPlay = document.getElementById('ic-play');
+const icPause = document.getElementById('ic-pause');
+const progArea = document.getElementById('progArea');
+const progFilled = document.getElementById('progFilled');
+const progBuffer = document.getElementById('progBuffer');
+const progThumb = document.getElementById('progThumb');
+const timeTxt = document.getElementById('timeTxt');
+const volRange = document.getElementById('volRange');
+const spSel = document.getElementById('spSel');
+
+function fmt(s){
+  if(isNaN(s)) return '0:00';
+  const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=Math.floor(s%60);
+  if(h>0) return `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+  return `${m}:${String(sec).padStart(2,'0')}`;
+}
+
+btnPP.addEventListener('click',()=>{
+  if(movieVideo.paused) movieVideo.play(); else movieVideo.pause();
+});
+movieVideo.addEventListener('play',()=>{ icPlay.style.display='none'; icPause.style.display=''; });
+movieVideo.addEventListener('pause',()=>{ icPlay.style.display=''; icPause.style.display='none'; });
+movieVideo.addEventListener('timeupdate',()=>{
+  if(!movieVideo.duration) return;
+  const p=movieVideo.currentTime/movieVideo.duration*100;
+  progFilled.style.width=p+'%';
+  progThumb.style.left=p+'%';
+  timeTxt.textContent=fmt(movieVideo.currentTime)+' / '+fmt(movieVideo.duration);
+});
+movieVideo.addEventListener('progress',()=>{
+  if(movieVideo.buffered.length>0&&movieVideo.duration)
+    progBuffer.style.width=(movieVideo.buffered.end(movieVideo.buffered.length-1)/movieVideo.duration*100)+'%';
+});
+
+let seekDrag=false;
+progArea.addEventListener('mousedown',e=>{seekDrag=true;seekTo(e);});
+document.addEventListener('mousemove',e=>{if(seekDrag)seekTo(e);});
+document.addEventListener('mouseup',()=>seekDrag=false);
+progArea.addEventListener('touchstart',e=>{seekTo(e.touches[0]);},{passive:true});
+progArea.addEventListener('touchmove',e=>{seekTo(e.touches[0]);},{passive:true});
+function seekTo(e){
+  if(!movieVideo.duration) return;
+  const r=progArea.getBoundingClientRect();
+  const p=Math.min(1,Math.max(0,(e.clientX-r.left)/r.width));
+  movieVideo.currentTime=p*movieVideo.duration;
+}
+
+volRange.addEventListener('input',()=>{
+  movieVideo.volume=parseFloat(volRange.value);
+  movieVideo.muted=movieVideo.volume===0;
+  updateVolIcon();
+});
+document.getElementById('btnMute2').addEventListener('click',()=>{
+  movieVideo.muted=!movieVideo.muted; updateVolIcon();
+});
+function updateVolIcon(){
+  const m=movieVideo.muted||movieVideo.volume===0;
+  document.getElementById('ic-vol').style.display=m?'none':'';
+  document.getElementById('ic-muted').style.display=m?'':'none';
+}
+
+spSel.addEventListener('change',()=>movieVideo.playbackRate=parseFloat(spSel.value));
+
+// 全屏
+document.getElementById('btnFs2').addEventListener('click',()=>{
+  if(document.fullscreenElement) document.exitFullscreen();
+  else document.getElementById('playerBody').requestFullscreen();
+});
+
+// 画中画
+document.getElementById('btnPip2').addEventListener('click',async()=>{
+  if(!movieVideo.src) return;
+  try{
+    if(document.pictureInPictureElement) await document.exitPictureInPicture();
+    else await movieVideo.requestPictureInPicture();
+  }catch(e){}
+});
+
+// 键盘
+document.addEventListener('keydown',e=>{
+  if(!playerModal.classList.contains('open')) return;
+  if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT') return;
+  switch(e.key){
+    case ' ': e.preventDefault(); btnPP.click(); break;
+    case 'ArrowRight': movieVideo.currentTime=Math.min(movieVideo.duration,movieVideo.currentTime+5); break;
+    case 'ArrowLeft': movieVideo.currentTime=Math.max(0,movieVideo.currentTime-5); break;
+    case 'Escape': closePlayer(); break;
+    case 'f': case 'F': document.getElementById('btnFs2').click(); break;
+    case 'm': case 'M': document.getElementById('btnMute2').click(); break;
+  }
+});
+
+// 触摸双击全屏
+let lastTap=0;
+document.getElementById('playerBody').addEventListener('touchend',()=>{
+  const now=Date.now();
+  if(now-lastTap<300){ document.getElementById('btnFs2').click(); }
+  lastTap=now;
+});
+
+// ── 收藏 ──
+function toggleFav(url, title){
+  const idx = favList.findIndex(f=>f.url===url);
+  if(idx>=0){ favList.splice(idx,1); showToast('已取消收藏'); }
+  else { favList.push({url,title}); showToast('❤️ 已收藏'); }
+  localStorage.setItem('cineplay_fav',JSON.stringify(favList));
+  renderFav();
+}
+function clearFav(){ favList=[]; localStorage.setItem('cineplay_fav','[]'); renderFav(); showToast('已清空收藏'); }
+function renderFav(){
+  const el=document.getElementById('favList');
+  if(!favList.length){
+    el.innerHTML=`<div class="fav-empty"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg><p>暂无收藏，播放视频时可添加收藏</p></div>`; return;
+  }
+  el.innerHTML = favList.map((f,i)=>`
+    <div class="history-item">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--accent)" style="flex-shrink:0"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+      <span class="history-url" onclick="playVideo('${f.url}','${f.title}')" title="${f.url}">${f.title||f.url}</span>
+      <button class="btn-del" onclick="favList.splice(${i},1);localStorage.setItem('cineplay_fav',JSON.stringify(favList));renderFav()">✕</button>
+    </div>`).join('');
+}
+
+// ── 历史 ──
+function clearHistory(){ histList=[]; localStorage.setItem('cineplay_hist','[]'); renderHistory(); showToast('已清空历史'); }
+function renderHistory(){
+  const el=document.getElementById('historyList');
+  if(!histList.length){
+    el.innerHTML=`<div class="fav-empty"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><p>暂无播放历史</p></div>`; return;
+  }
+  el.innerHTML = histList.map((h,i)=>`
+    <div class="history-item">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <span class="history-url" onclick="playVideo('${h.url}','${h.title}')" title="${h.url}">${h.title||h.url}</span>
+      <span class="history-time">${h.time}</span>
+      <button class="btn-del" onclick="histList.splice(${i},1);localStorage.setItem('cineplay_hist',JSON.stringify(histList));renderHistory()">✕</button>
+    </div>`).join('');
+}
+
+// ── 页面切换 ──
+function switchPage(page, btn){
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  document.getElementById('pageHome').style.display=page==='home'?'':'none';
+  document.getElementById('pageFav').style.display=page==='fav'?'':'none';
+  document.getElementById('pageHistory').style.display=page==='history'?'':'none';
+  if(page==='fav') renderFav();
+  if(page==='history') renderHistory();
+}
+
+// ── Toast ──
+let toastTimer;
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+// ── 搜索 ──
+document.getElementById('globalSearch').addEventListener('input',function(){
+  const q=this.value.toLowerCase();
+  const filtered=SAMPLES.filter(m=>m.title.toLowerCase().includes(q)||m.meta.toLowerCase().includes(q));
+  renderSamples(filtered);
+});
+
+// ── 初始化 ──
+renderSamples(SAMPLES);
+</script>
+</body>
+</html>
